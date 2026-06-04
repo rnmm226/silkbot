@@ -1,0 +1,32 @@
+[
+  {
+    "parts": [
+      {
+        "type": "text",
+        "text": "bonjour"
+      }
+    ],
+    "id": "msgc-0Fx4k86S1yOjm9Jx",
+    "role": "user"
+  },
+  {
+    "id": "",
+    "role": "assistant",
+    "parts": []
+  },
+  {
+    "parts": [
+      {
+        "type": "text",
+        "text": "bonjour"
+      }
+    ],
+    "id": "msgc-YiYTqn1tfWdtpQGM",
+    "role": "user"
+  },
+  {
+    "id": "",
+    "role": "assistant",
+    "parts": []
+  }
+]
