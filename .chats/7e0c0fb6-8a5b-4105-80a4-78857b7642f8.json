@@ -1,0 +1,26 @@
+{
+  "id": "7e0c0fb6-8a5b-4105-80a4-78857b7642f8",
+  "messages": [
+    {
+      "id": "ffb165bd-8a03-4e27-9cbe-be88bfc18a92",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "fv,lkds,"
+        }
+      ]
+    },
+    {
+      "id": "9Qb7xGD6honiKa1s",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "That looks like a random string of characters: 'fv,lkds,'.\n\nCould you please clarify what you mean or what you're trying to communicate?"
+        }
+      ]
+    }
+  ],
+  "activeStreamId": null
+}

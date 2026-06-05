@@ -1,4 +1,5 @@
-import { readChat } from '@util/chat-store';
+// app/api/chat/[id]/stream/route.ts
+import { readChat } from '@/util/chat-store';
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai';
 import { after } from 'next/server';
 import { createResumableStreamContext } from 'resumable-stream';
@@ -11,7 +12,7 @@ export async function GET(
 
   const chat = await readChat(id);
 
-  if (chat.activeStreamId == null) {
+  if (chat?.activeStreamId == null) {
     // no content response when there is no active stream
     return new Response(null, { status: 204 });
   }

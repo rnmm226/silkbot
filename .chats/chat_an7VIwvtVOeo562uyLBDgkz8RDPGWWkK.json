@@ -1,32 +1,206 @@
-[
-  {
-    "parts": [
-      {
-        "type": "text",
-        "text": "bonjour"
-      }
-    ],
-    "id": "msgc-0Fx4k86S1yOjm9Jx",
-    "role": "user"
-  },
-  {
-    "id": "",
-    "role": "assistant",
-    "parts": []
-  },
-  {
-    "parts": [
-      {
-        "type": "text",
-        "text": "bonjour"
-      }
-    ],
-    "id": "msgc-YiYTqn1tfWdtpQGM",
-    "role": "user"
-  },
-  {
-    "id": "",
-    "role": "assistant",
-    "parts": []
-  }
-]
+{
+  "id": "chat_an7VIwvtVOeo562uyLBDgkz8RDPGWWkK",
+  "messages": [
+    {
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ],
+      "id": "msgc-0Fx4k86S1yOjm9Jx",
+      "role": "user"
+    },
+    {
+      "id": "",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ],
+      "id": "msgc-YiYTqn1tfWdtpQGM",
+      "role": "user"
+    },
+    {
+      "id": "",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-AbSU8S93MzRx7Ljd",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "dMmOkvSCW22LnvcJ",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-UJw9jhZQ5Y7b0e5i",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "BCugtC0PrBYXqyWC",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-ZHqegWsp15pOo1Sn",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "Rk07j8qJUstYRpPW",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-xwU4tQtqEPBJA5nf",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "x4HgZCSvUUClrXBT",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-XfKR6xBHLuhkVikQ",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "MqkYM9gn4wXggtEt",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-zJBdWiqccdFzSUQ2",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "jdSn9iHqjIMoZO39",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-fA404STQfvCNxlxx",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "gTzTkBPGnPDoVVRT",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "id": "msgc-Ns3fKqZMm0dxhpoB",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "w3NzcLJujBS16c3O",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Bonjour ! Un bonjour très enthousiaste !\n\nComment puis-je vous aider aujourd'hui ?"
+        }
+      ]
+    },
+    {
+      "id": "msgc-bJcWrdFK66rt0W9W",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "eODZxmbq1jNX8rLx",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Bonjour !\n\nJe suis là. Dites-moi, comment puis-je vous aider cette fois-ci ?"
+        }
+      ]
+    },
+    {
+      "id": "msgc-73kqiikYZ5Lw3zox",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "jsfsjgem"
+        }
+      ]
+    },
+    {
+      "id": "9TVVnigKuaA25XLB",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "Il semblerait que vous ayez tapé des caractères aléatoires.\n\nEst-ce que vous vouliez dire quelque chose en particulier ? N'hésitez pas à reformuler !"
+        }
+      ]
+    }
+  ],
+  "activeStreamId": null
+}

@@ -1,21 +1,31 @@
-import { authClient } from "@/lib/auth-client";
+// app/actions/auth.ts
+'use server';
 
-const { data, error } = await authClient.signIn.email({
-    /**
-     * The user email
-     */
-    email: email,
-    /**
-     * The user password
-     */
-    password: password,
-    /**
-     * A URL to redirect to after the user verifies their email (optional)
-     */
-    callbackURL: "/dashboard",
-    /**
-     * remember the user session after the browser is closed. 
-     * @default true
-     */
-    rememberMe: false
-});
+import { authClient } from "@/lib/auth-client";
+import { redirect } from 'next/navigation';
+
+export async function login(formData: FormData) {
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+
+  if (!email || !password) {
+    return { error: 'Email et mot de passe requis' };
+  }
+
+  try {
+    const { data, error } = await authClient.signIn.email({
+      email: email,
+      password: password,
+      callbackURL: "/dashboard",
+      rememberMe: false
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    redirect('/dashboard');
+  } catch (err) {
+    return { error: 'Une erreur est survenue' };
+  }
+}

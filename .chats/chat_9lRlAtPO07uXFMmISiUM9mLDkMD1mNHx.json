@@ -1,0 +1,210 @@
+{
+  "messages": [
+    {
+      "id": "msgc-WUeLFaDcfsUApd8e",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bonjour"
+        }
+      ]
+    },
+    {
+      "id": "w5yTEAPc9vaVGyLV",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msg_1780619653089_0.5403447947344229",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "id": "user_1780619732696",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "id": "user_1780619790138",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "id": "user_1780619949780",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "envl"
+        }
+      ]
+    },
+    {
+      "id": "user_1780620106974",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "gkjngdl"
+        }
+      ]
+    },
+    {
+      "id": "msgc-4chwKlCoWeyLQIVX",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bfgbf"
+        }
+      ]
+    },
+    {
+      "id": "msgc-elA35ga7JSNzvm2F",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "vvfb"
+        }
+      ]
+    },
+    {
+      "id": "msgc-M6eo96j9foiRRZvG",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "gfbfb"
+        }
+      ]
+    },
+    {
+      "id": "msgc-IwRXikLnHLQ6qv9v",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bfbf"
+        }
+      ]
+    },
+    {
+      "id": "msgc-YAsllsOdWXKADD19",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bjb"
+        }
+      ]
+    },
+    {
+      "id": "msgc-kwKN7rfGCVtj6QPf",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "ranim"
+        }
+      ]
+    },
+    {
+      "id": "Hi0EJjwZoEgEqpXF",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-fMXX7ajAKK3SYnez",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "zqfjd"
+        }
+      ]
+    },
+    {
+      "id": "w7qJSjk00Fh3ng9I",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-17M0H3O7vz8vrkFZ",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "verg"
+        }
+      ]
+    },
+    {
+      "id": "fx1rnUaA1JOSrLqh",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-sXfVIKYTzyezdTZl",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "fghfh"
+        }
+      ]
+    },
+    {
+      "id": "2pW6LQFvk7fB6gCE",
+      "role": "assistant",
+      "parts": []
+    },
+    {
+      "id": "msgc-jdOMRQ3J4YReY7JW",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "sfsvdnbfg"
+        }
+      ]
+    },
+    {
+      "id": "msgc-oupGthwHffXv0kfk",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "htyrbv"
+        }
+      ]
+    },
+    {
+      "id": "msgc-eCHsgeNb5RI74pgo",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "sqdvss "
+        }
+      ]
+    }
+  ],
+  "activeStreamId": null
+}

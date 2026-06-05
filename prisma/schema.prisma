@@ -1,36 +1,31 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
 }
 
 model User {
   id            String    @id
   name          String    @db.Text
-  email         String
+  email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  sessions      Session[]
   accounts      Account[]
+  chats         Chat[]
+  sessions      Session[]
 
-  @@unique([email])
   @@map("user")
 }
 
 model Session {
   id        String   @id
   expiresAt DateTime
-  token     String
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   ipAddress String?  @db.Text
@@ -38,8 +33,7 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
-  @@index([userId(length: 191)])
+  @@index([userId])
   @@map("session")
 }
 
@@ -48,7 +42,6 @@ model Account {
   accountId             String    @db.Text
   providerId            String    @db.Text
   userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?   @db.Text
   refreshToken          String?   @db.Text
   idToken               String?   @db.Text
@@ -58,8 +51,9 @@ model Account {
   password              String?   @db.Text
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId(length: 191)])
+  @@index([userId])
   @@map("account")
 }
 
@@ -71,6 +65,33 @@ model Verification {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@index([identifier(length: 191)])
+  @@index([identifier])
   @@map("verification")
+}
+
+model Chat {
+  id             String    @id @default(cuid())
+  title          String?   @db.Text
+  activeStreamId String?   @map("active_stream_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  userId         String?   @map("user_id")
+  user           User?     @relation(fields: [userId], references: [id])
+  messages       Message[]
+
+  @@index([userId])
+  @@map("chats")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chatId    String   @map("chat_id")
+  role      String
+  content   String   @db.Text
+  parts     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("messages")
 }

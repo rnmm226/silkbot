@@ -1,6 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -37,8 +38,8 @@
   --sidebar-accent-foreground: oklch(1.0000 0 0);
   --sidebar-border: oklch(0.6440 0.0405 52.3917);
   --sidebar-ring: oklch(0.6083 0.0623 44.3588);
-  --font-sans: DM Sans, sans-serif;
-  --font-serif: Georgia, serif;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 0.5rem;
   --shadow-x: 2px;
@@ -48,12 +49,12 @@
   --shadow-opacity: 0.11;
   --shadow-color: hsl(20 18% 51% / 0.4);
   --shadow-2xs: 2px 2px 0px 0px hsl(20 18% 51% / 0.06);
-  --shadow-xs: 2px 2px 0px 0px hsl(20 18% 51% / 0.06);
-  --shadow-sm: 2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 1px 2px -1px hsl(20 18% 51% / 0.11);
-  --shadow: 2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 1px 2px -1px hsl(20 18% 51% / 0.11);
-  --shadow-md: 2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 2px 4px -1px hsl(20 18% 51% / 0.11);
-  --shadow-lg: 2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 4px 6px -1px hsl(20 18% 51% / 0.11);
-  --shadow-xl: 2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 8px 10px -1px hsl(20 18% 51% / 0.11);
+  --shadow-xs:  2px 2px 0px 0px hsl(20 18% 51% / 0.06);
+  --shadow-sm:  2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 1px 2px -1px hsl(20 18% 51% / 0.11);
+  --shadow:     2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 1px 2px -1px hsl(20 18% 51% / 0.11);
+  --shadow-md:  2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 2px 4px -1px hsl(20 18% 51% / 0.11);
+  --shadow-lg:  2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 4px 6px -1px hsl(20 18% 51% / 0.11);
+  --shadow-xl:  2px 2px 0px 0px hsl(20 18% 51% / 0.11), 2px 8px 10px -1px hsl(20 18% 51% / 0.11);
   --shadow-2xl: 2px 2px 0px 0px hsl(20 18% 51% / 0.28);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
@@ -92,23 +93,14 @@
   --sidebar-accent-foreground: oklch(0.2225 0.0098 52.9636);
   --sidebar-border: oklch(0.4063 0.0255 40.3627);
   --sidebar-ring: oklch(0.7272 0.0539 52.3320);
-  --font-sans: DM Sans, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
-  --radius: 0.5rem;
-  --shadow-x: 2px;
-  --shadow-y: 2px;
-  --shadow-blur: 0px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.11;
   --shadow-color: hsl(20 18% 30% / 0.5);
   --shadow-2xs: 2px 2px 0px 0px hsl(20 18% 30% / 0.06);
-  --shadow-xs: 2px 2px 0px 0px hsl(20 18% 30% / 0.06);
-  --shadow-sm: 2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 1px 2px -1px hsl(20 18% 30% / 0.11);
-  --shadow: 2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 1px 2px -1px hsl(20 18% 30% / 0.11);
-  --shadow-md: 2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 2px 4px -1px hsl(20 18% 30% / 0.11);
-  --shadow-lg: 2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 4px 6px -1px hsl(20 18% 30% / 0.11);
-  --shadow-xl: 2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 8px 10px -1px hsl(20 18% 30% / 0.11);
+  --shadow-xs:  2px 2px 0px 0px hsl(20 18% 30% / 0.06);
+  --shadow-sm:  2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 1px 2px -1px hsl(20 18% 30% / 0.11);
+  --shadow:     2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 1px 2px -1px hsl(20 18% 30% / 0.11);
+  --shadow-md:  2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 2px 4px -1px hsl(20 18% 30% / 0.11);
+  --shadow-lg:  2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 4px 6px -1px hsl(20 18% 30% / 0.11);
+  --shadow-xl:  2px 2px 0px 0px hsl(20 18% 30% / 0.11), 2px 8px 10px -1px hsl(20 18% 30% / 0.11);
   --shadow-2xl: 2px 2px 0px 0px hsl(20 18% 30% / 0.28);
 }
 
@@ -145,16 +137,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
-
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -163,13 +152,67 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  /* ── Custom animations ── */
+  --animate-fadeIn:       fadeIn 0.6s ease both;
+  --animate-fadeUp:       fadeUp 0.8s cubic-bezier(0.22,1,0.36,1) both;
+  --animate-scaleIn:      scaleIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
+  --animate-navSlide:     navSlide 0.5s cubic-bezier(0.22,1,0.36,1) both;
+  --animate-pulseRing:    pulseRing 2.5s ease-out infinite;
+  --animate-float:        float 7s ease-in-out infinite;
+  --animate-float-reverse:float 9s ease-in-out infinite reverse;
+  --animate-shimmer:      shimmer 3s linear infinite;
+  --animate-slideRight:   slideRight 0.6s cubic-bezier(0.22,1,0.36,1) both;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes navSlide {
+    from { opacity: 0; transform: translateY(-100%); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseRing {
+    0%   { box-shadow: 0 0 0 0px oklch(0.6083 0.0623 44.3588 / 0.45); }
+    70%  { box-shadow: 0 0 0 10px oklch(0.6083 0.0623 44.3588 / 0); }
+    100% { box-shadow: 0 0 0 0px oklch(0.6083 0.0623 44.3588 / 0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+  }
+  @keyframes slideRight {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-family: var(--font-sans);
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .font-serif {
+    font-family: var(--font-serif);
   }
 }

@@ -1,0 +1,26 @@
+{
+  "id": "cfa086cf-6da4-4722-ac28-144495161274",
+  "messages": [
+    {
+      "id": "fe1c8633-4dcb-4425-b92f-b6ba5c364dc3",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "bnkjnb"
+        }
+      ]
+    },
+    {
+      "id": "CbtMwnMk6owfGu2W",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "It looks like you've typed a random string of characters: \"bnkjnb\".\n\nIs there something specific you wanted to ask or say? Please let me know if you meant something else!"
+        }
+      ]
+    }
+  ],
+  "activeStreamId": null
+}
