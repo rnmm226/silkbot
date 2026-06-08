@@ -43,7 +43,8 @@ export async function POST(req: Request) {
       parts: [{ text: getMessageText(msg) }],
     }));
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemma-4-31b-it' });
+    console.log(history.map(e=> ({...e,textmsg: e.parts.map(e=> e.text).join(" ") })))
     const chatSession = model.startChat({ history });
     const geminiStream = await chatSession.sendMessageStream(messageText);
 
