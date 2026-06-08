@@ -137,30 +137,39 @@ const data = {
 export function AppSidebarHistory(){
   const [chats, setChats] = useState([]);
   
-  
   useEffect(()=> {
       fetch('/api/chat')
         .then(resp=>resp.json())
-        .then(d=> {setChats(d)})
-  })  
+        .then(d=> {
+          if (Array.isArray(d)) {
+            setChats(d);
+          } else {
+            setChats([]);
+          }
+        })
+        .catch(err => {
+          console.error('Erreur:', err);
+          setChats([]);
+        });
+  }, [])
 
-  console.log("chats already updated")
+  if (!Array.isArray(chats) || chats.length === 0) {
+    return null;
+  }
   
   return(
     <>
-     {chats.map(e=> (
-      
-      
-            <a href="/dashboard/{e.id}/">
-              {e.title}
-            </a>
-            
-))}
-    
+     {chats.map((e) => (
+        <button key={e.id}>
+          <a href={`/dashboard/${e.id}`}>  {/* ← ICI : backticks et ${} */}
+            {e.title}
+          </a>
+        </button>
+     ))}
     </>
   )
 }
-
+    
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar className="border-r-0" {...props}>

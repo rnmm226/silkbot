@@ -1,5 +1,5 @@
 // util/chat-store.ts
-import { Message, Prisma } from '@/lib/generated/prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { type UIMessage } from 'ai';
 
@@ -20,26 +20,25 @@ function getMessageText(message: UIMessage): string {
 }
 
 // Helper pour convertir un message DB en UIMessage
-function dbMessageToUIMessage(msg: Message): UIMessage {
+function dbMessageToUIMessage(msg: any): UIMessage {
   // Convertir via JSON pour éviter les problèmes de types
-  const parts = JSON.parse(JSON.stringify(msg.parts)) as UIMessage['parts'];
+  const parts = msg.parts ? JSON.parse(JSON.stringify(msg.parts)) as UIMessage['parts'] : [];
   
   return {
     id: msg.id,
     role: msg.role as 'user' | 'assistant',
     parts: parts,
-
   };
 }
 
 // Helper pour convertir UIMessage en format DB (sans createdAt)
-function uiMessageToDbData(msg: UIMessage, chatId: string): Omit<Message, 'createdAt'> & { createdAt: Date } {
+function uiMessageToDbData(msg: UIMessage, chatId: string) {
   return {
     id: msg.id,
     chatId: chatId,
     role: msg.role,
     content: getMessageText(msg),
-    parts: msg.parts as Prisma.JsonValue, // Casting explicite vers JsonValue
+    parts: msg.parts as Prisma.JsonValue,
     createdAt: new Date(),
   };
 }
@@ -68,7 +67,9 @@ export async function readChat(id: string): Promise<ChatWithMessages | null> {
       },
     });
     
-    if (!chat) return null;
+    if (!chat) {
+      return null;
+    }
     
     const uiMessages: UIMessage[] = chat.messages.map(dbMessageToUIMessage);
     
@@ -76,7 +77,7 @@ export async function readChat(id: string): Promise<ChatWithMessages | null> {
       id: chat.id,
       title: chat.title,
       messages: uiMessages,
-      activeStreamId: chat.activeStreamId,
+      activeStreamId: chat.activeStreamId || null,
       userId: chat.userId,
     };
   } catch (error) {
@@ -112,7 +113,7 @@ export async function saveChat({
       });
     } else {
       // Mettre à jour les champs du chat
-      const updateData: Prisma.ChatUpdateInput = {};
+      const updateData: any = {};
       if (activeStreamId !== undefined) updateData.activeStreamId = activeStreamId;
       if (title !== undefined) updateData.title = title;
       
@@ -135,7 +136,7 @@ export async function saveChat({
       if (messages.length > 0) {
         const messagesData = messages.map(msg => uiMessageToDbData(msg, chatId));
         await prisma.message.createMany({
-          data: messagesData as Prisma.MessageCreateManyInput[], // Casting temporaire pour Prisma
+          data: messagesData,
         });
       }
     }
