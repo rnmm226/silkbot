@@ -119,7 +119,7 @@ function ChatItem({
       <SidebarMenuButton
         asChild
         isActive={isActive}
-        tooltip={chat.title}
+        tooltip={chat.title || ''}
         onClick={() => {
           setOpenMobile?.(false);
           router.push(`/chat/${chat.id}`);

@@ -1,165 +1,297 @@
-"use client";
+"use client"
 
-import {
-  MessageSquareIcon,
-  PanelLeftIcon,
-  PenSquareIcon,
-  TrashIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { User } from "next-auth";
-import { useState } from "react";
-import { toast } from "sonner";
-import { useSWRConfig } from "swr";
-import { unstable_serialize } from "swr/infinite";
-import {
-  getChatHistoryPaginationKey,
-  SidebarHistory,
-} from "@/components/sidebar-history";
-import { SidebarUserNav } from "@/components/sidebar-user-nav";
+import * as React from "react"
+
+import { NavFavorites } from "@/components/nav-favorites"
+import { NavMain } from "@/components/nav-main"
+import { NavSecondary } from "@/components/nav-secondary"
+import { NavWorkspaces } from "@/components/nav-workspaces"
+import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+} from "@/components/ui/sidebar"
+import { TerminalIcon, AudioLinesIcon, SearchIcon, SparklesIcon, HomeIcon, InboxIcon, CalendarIcon, Settings2Icon, BlocksIcon, Trash2Icon, MessageCircleQuestionIcon } from "lucide-react"
 
-export function AppSidebar({ user }: { user: User | undefined }) {
-  const router = useRouter();
-  const { setOpenMobile, toggleSidebar } = useSidebar();
-  const { mutate } = useSWRConfig();
-  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+// This is sample data.
+const data = {
+  teams: [
+    {
+      name: "Chatbot",
+      logo: (
+        <TerminalIcon
+        />
+      ),
+      plan: "Enterprise",
+    },
+    {
+      name: "Acme Corp.",
+      logo: (
+        <AudioLinesIcon
+        />
+      ),
+      plan: "Startup",
+    },
+    {
+      name: "Evil Corp.",
+      logo: (
+        <TerminalIcon
+        />
+      ),
+      plan: "Free",
+    },
+  ],
+  navMain: [
+    {
+      title: "Search",
+      url: "#",
+      icon: (
+        <SearchIcon
+        />
+      ),
+    },
+    
+    {
+      title: "Ask AI",
+      url: "#",
+      icon: (
+        <SparklesIcon
+        />
+      ),
+    },
+    {
+      title: "Home",
+      url: "#",
+      icon: (
+        <HomeIcon
+        />
+      ),
+      isActive: true,
+    },
+    {
+      title: "Inbox",
+      url: "#",
+      icon: (
+        <InboxIcon
+        />
+      ),
+      badge: "10",
+    },
+  ],
+  navSecondary: [
+    {
+      title: "Calendar",
+      url: "#",
+      icon: (
+        <CalendarIcon
+        />
+      ),
+    },
+    {
+      title: "Settings",
+      url: "#",
+      icon: (
+        <Settings2Icon
+        />
+      ),
+    },
+    {
+      title: "Templates",
+      url: "#",
+      icon: (
+        <BlocksIcon
+        />
+      ),
+    },
+    {
+      title: "Trash",
+      url: "#",
+      icon: (
+        <Trash2Icon
+        />
+      ),
+    },
+    {
+      title: "Help",
+      url: "#",
+      icon: (
+        <MessageCircleQuestionIcon
+        />
+      ),
+    },
+  ],
+  favorites: [
+    {
+      name: "Project Management & Task Tracking",
+      url: "#",
+      emoji: "📊",
+    },
+    {
+      name: "Family Recipe Collection & Meal Planning",
+      url: "#",
+      emoji: "🍳",
+    },
+    {
+      name: "Fitness Tracker & Workout Routines",
+      url: "#",
+      emoji: "💪",
+    },
+    {
+      name: "Book Notes & Reading List",
+      url: "#",
+      emoji: "📚",
+    },
+    {
+      name: "Sustainable Gardening Tips & Plant Care",
+      url: "#",
+      emoji: "🌱",
+    },
+    {
+      name: "Language Learning Progress & Resources",
+      url: "#",
+      emoji: "🗣️",
+    },
+    {
+      name: "Home Renovation Ideas & Budget Tracker",
+      url: "#",
+      emoji: "🏠",
+    },
+    {
+      name: "Personal Finance & Investment Portfolio",
+      url: "#",
+      emoji: "💰",
+    },
+    {
+      name: "Movie & TV Show Watchlist with Reviews",
+      url: "#",
+      emoji: "🎬",
+    },
+    {
+      name: "Daily Habit Tracker & Goal Setting",
+      url: "#",
+      emoji: "✅",
+    },
+  ],
+  workspaces: [
+    {
+      name: "Personal Life Management",
+      emoji: "🏠",
+      pages: [
+        {
+          name: "Daily Journal & Reflection",
+          url: "#",
+          emoji: "📔",
+        },
+        {
+          name: "Health & Wellness Tracker",
+          url: "#",
+          emoji: "🍏",
+        },
+        {
+          name: "Personal Growth & Learning Goals",
+          url: "#",
+          emoji: "🌟",
+        },
+      ],
+    },
+    {
+      name: "Professional Development",
+      emoji: "💼",
+      pages: [
+        {
+          name: "Career Objectives & Milestones",
+          url: "#",
+          emoji: "🎯",
+        },
+        {
+          name: "Skill Acquisition & Training Log",
+          url: "#",
+          emoji: "🧠",
+        },
+        {
+          name: "Networking Contacts & Events",
+          url: "#",
+          emoji: "🤝",
+        },
+      ],
+    },
+    {
+      name: "Creative Projects",
+      emoji: "🎨",
+      pages: [
+        {
+          name: "Writing Ideas & Story Outlines",
+          url: "#",
+          emoji: "✍️",
+        },
+        {
+          name: "Art & Design Portfolio",
+          url: "#",
+          emoji: "🖼️",
+        },
+        {
+          name: "Music Composition & Practice Log",
+          url: "#",
+          emoji: "🎵",
+        },
+      ],
+    },
+    {
+      name: "Home Management",
+      emoji: "🏡",
+      pages: [
+        {
+          name: "Household Budget & Expense Tracking",
+          url: "#",
+          emoji: "💰",
+        },
+        {
+          name: "Home Maintenance Schedule & Tasks",
+          url: "#",
+          emoji: "🔧",
+        },
+        {
+          name: "Family Calendar & Event Planning",
+          url: "#",
+          emoji: "📅",
+        },
+      ],
+    },
+    {
+      name: "Travel & Adventure",
+      emoji: "🧳",
+      pages: [
+        {
+          name: "Trip Planning & Itineraries",
+          url: "#",
+          emoji: "🗺️",
+        },
+        {
+          name: "Travel Bucket List & Inspiration",
+          url: "#",
+          emoji: "🌎",
+        },
+        {
+          name: "Travel Journal & Photo Gallery",
+          url: "#",
+          emoji: "📸",
+        },
+      ],
+    },
+  ],
+}
 
-  const handleDeleteAll = () => {
-    setShowDeleteAllDialog(false);
-    router.replace("/");
-    mutate(unstable_serialize(getChatHistoryPaginationKey), [], {
-      revalidate: false,
-    });
-
-    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history`, {
-      method: "DELETE",
-    });
-
-    toast.success("All chats deleted");
-  };
-
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <>
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="pb-0 pt-3">
-          <SidebarMenu>
-            <SidebarMenuItem className="flex flex-row items-center justify-between">
-              <div className="group/logo relative flex items-center justify-center">
-                <SidebarMenuButton
-                  asChild
-                  className="size-8 !px-0 items-center justify-center group-data-[collapsible=icon]:group-hover/logo:opacity-0"
-                  tooltip="Chatbot"
-                >
-                  <Link href="/" onClick={() => setOpenMobile(false)}>
-                    <MessageSquareIcon className="size-4 text-sidebar-foreground/50" />
-                  </Link>
-                </SidebarMenuButton>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      className="pointer-events-none absolute inset-0 size-8 opacity-0 group-data-[collapsible=icon]:pointer-events-auto group-data-[collapsible=icon]:group-hover/logo:opacity-100"
-                      onClick={() => toggleSidebar()}
-                    >
-                      <PanelLeftIcon className="size-4" />
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent className="hidden md:block" side="right">
-                    Open sidebar
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="group-data-[collapsible=icon]:hidden">
-                <SidebarTrigger className="text-sidebar-foreground/60 transition-colors duration-150 hover:text-sidebar-foreground" />
-              </div>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup className="pt-1">
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                    onClick={() => {
-                      setOpenMobile(false);
-                      router.push("/");
-                    }}
-                    tooltip="New Chat"
-                  >
-                    <PenSquareIcon className="size-4" />
-                    <span className="font-medium">New chat</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {user && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => setShowDeleteAllDialog(true)}
-                      tooltip="Delete All Chats"
-                    >
-                      <TrashIcon className="size-4" />
-                      <span className="text-[13px]">Delete all</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarHistory user={user} />
-        </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border pt-2 pb-3">
-          {user && <SidebarUserNav user={user} />}
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-
-      <AlertDialog
-        onOpenChange={setShowDeleteAllDialog}
-        open={showDeleteAllDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all
-              your chats and remove them from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAll}>
-              Delete All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+    <Sidebar className="border-r-0" {...props}>
+      <SidebarHeader>
+        <TeamSwitcher teams={data.teams} />
+        <NavMain items={data.navMain} />
+      </SidebarHeader>
+      
+      <SidebarRail />
+    </Sidebar>
+  )
 }

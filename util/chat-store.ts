@@ -135,7 +135,7 @@ export async function saveChat({
       if (messages.length > 0) {
         const messagesData = messages.map(msg => uiMessageToDbData(msg, chatId));
         await prisma.message.createMany({
-          data: messagesData as any, // Casting temporaire pour Prisma
+          data: messagesData as Prisma.MessageCreateManyInput[], // Casting temporaire pour Prisma
         });
       }
     }
