@@ -8,61 +8,65 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  BookmarkIcon,
-  MoreHorizontalIcon,
-  ShareIcon,
+  Settings2Icon,
+  FileTextIcon,
+  LinkIcon,
   CopyIcon,
-  DownloadIcon,
+  CornerUpRightIcon,
   Trash2Icon,
-  RotateCcwIcon,
-  HistoryIcon,
+  CornerUpLeftIcon,
+  GalleryVerticalEndIcon,
+  TrashIcon,
   BellIcon,
-  ExternalLinkIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  StarIcon,
+  MoreHorizontalIcon,
 } from "lucide-react"
 
-const actions = [
-  {
-    group: "Conversation",
-    items: [
-      { label: "Partager", icon: ShareIcon },
-      { label: "Copier le lien", icon: CopyIcon },
-      { label: "Exporter (PDF)", icon: DownloadIcon },
-    ],
-  },
-  {
-    group: "Historique",
-    items: [
-      { label: "Annuler", icon: RotateCcwIcon },
-      { label: "Historique des versions", icon: HistoryIcon },
-      { label: "Notifications", icon: BellIcon },
-    ],
-  },
-  {
-    group: "Danger",
-    items: [
-      { label: "Supprimer la conversation", icon: Trash2Icon, danger: true },
-    ],
-  },
+const data = [
+  [
+    { label: "Personnaliser",   icon: Settings2Icon },
+    { label: "Convertir en doc", icon: FileTextIcon },
+  ],
+  [
+    { label: "Copier le lien",  icon: LinkIcon },
+    { label: "Dupliquer",       icon: CopyIcon },
+    { label: "Déplacer vers",   icon: CornerUpRightIcon },
+    { label: "Supprimer",       icon: Trash2Icon },
+  ],
+  [
+    { label: "Annuler",         icon: CornerUpLeftIcon },
+    { label: "Historique",      icon: GalleryVerticalEndIcon },
+    { label: "Corbeille",       icon: TrashIcon },
+    { label: "Notifications",   icon: BellIcon },
+  ],
+  [
+    { label: "Importer",        icon: ArrowUpIcon },
+    { label: "Exporter",        icon: ArrowDownIcon },
+  ],
 ]
 
 export function NavActions() {
   const [isOpen, setIsOpen] = React.useState(false)
-  const [bookmarked, setBookmarked] = React.useState(false)
+  const [starred, setStarred] = React.useState(false)
 
   return (
     <div className="flex items-center gap-1">
-      {/* Bookmark */}
+      {/* Star button */}
       <Button
         variant="ghost"
         size="icon"
-        className={`h-7 w-7 transition-colors ${bookmarked ? 'text-accent' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={() => setBookmarked(v => !v)}
-        title={bookmarked ? "Retirer des favoris" : "Ajouter aux favoris"}
+        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        onClick={() => setStarred(v => !v)}
+        title={starred ? "Retirer des favoris" : "Ajouter aux favoris"}
       >
-        <BookmarkIcon className={`w-3.5 h-3.5 ${bookmarked ? 'fill-current' : ''}`} />
+        <StarIcon
+          className={`w-4 h-4 transition-colors ${starred ? "fill-sidebar-primary text-sidebar-primary" : ""}`}
+        />
       </Button>
 
-      {/* More */}
+      {/* More options */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -70,50 +74,42 @@ export function NavActions() {
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground"
           >
-            <MoreHorizontalIcon className="w-3.5 h-3.5" />
+            <MoreHorizontalIcon className="w-4 h-4" />
           </Button>
         </PopoverTrigger>
+
         <PopoverContent
-          className="w-52 p-1.5 rounded-xl border border-border/50 shadow-lg bg-popover"
+          className="w-52 p-1 rounded-xl border border-border/60 shadow-lg bg-popover"
           align="end"
           sideOffset={6}
         >
-          {actions.map((group, gi) => (
+          {data.map((group, gi) => (
             <div key={gi}>
-              {gi > 0 && <div className="h-px bg-border/40 my-1 mx-1" />}
+              {gi > 0 && (
+                <div className="my-1 h-px bg-border/40 mx-1" />
+              )}
               <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <button
-                    key={item.label}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left
-                      ${item.danger
-                        ? 'text-destructive hover:bg-destructive/8'
-                        : 'text-foreground/70 hover:bg-muted hover:text-foreground'
-                      }`}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <item.icon className="w-3.5 h-3.5 shrink-0" />
-                    {item.label}
-                  </button>
-                ))}
+                {group.map((item) => {
+                  const Icon = item.icon
+                  const isDanger = item.label === "Supprimer" || item.label === "Corbeille"
+                  return (
+                    <button
+                      key={item.label}
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left
+                        text-xs font-light transition-colors
+                        ${isDanger
+                          ? "text-destructive/70 hover:text-destructive hover:bg-destructive/8"
+                          : "text-popover-foreground/70 hover:text-popover-foreground hover:bg-muted/60"
+                        }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      {item.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ))}
-
-          {/* Footer */}
-          <div className="h-px bg-border/40 my-1 mx-1" />
-          <div className="px-2.5 py-1.5 flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground/40 font-light">SilkBot</span>
-            <a
-              href="http://localhost:3000/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground flex items-center gap-1 transition-colors"
-            >
-              <ExternalLinkIcon className="w-2.5 h-2.5" />
-              Site
-            </a>
-          </div>
         </PopoverContent>
       </Popover>
     </div>
