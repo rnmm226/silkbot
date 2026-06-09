@@ -13,7 +13,7 @@ export default function RegisterPage() {
           <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold animate-pulseRing">
             ⚖
           </div>
-          <span className="font-serif text-lg font-bold text-primary">Tunisia Law</span>
+          <span className="font-serif text-lg font-bold text-primary">SilkBot</span>
         </Link>
         <RegisterForm />
       </div>

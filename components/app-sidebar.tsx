@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { generateId } from "ai"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,31 +26,21 @@ import {
 import { TerminalIcon, AudioLinesIcon, SearchIcon, SparklesIcon, HomeIcon, InboxIcon, CalendarIcon, Settings2Icon, BlocksIcon, Trash2Icon, MessageCircleQuestionIcon } from "lucide-react"
 import * as React from "react"
 
-// This is sample data.
 const data = {
   teams: [
     {
       name: "Chatbot",
-      logo: (
-        <TerminalIcon
-        />
-      ),
+      logo: <TerminalIcon />,
       plan: "Enterprise",
     },
     {
       name: "Acme Corp.",
-      logo: (
-        <AudioLinesIcon
-        />
-      ),
+      logo: <AudioLinesIcon />,
       plan: "Startup",
     },
     {
       name: "Evil Corp.",
-      logo: (
-        <TerminalIcon
-        />
-      ),
+      logo: <TerminalIcon />,
       plan: "Free",
     },
   ],
@@ -56,36 +48,23 @@ const data = {
     {
       title: "Search",
       url: "#",
-      icon: (
-        <SearchIcon
-        />
-      ),
+      icon: <SearchIcon />,
     },
-    
     {
       title: "Ask AI",
       url: "#",
-      icon: (
-        <SparklesIcon
-        />
-      ),
+      icon: <SparklesIcon />,
     },
     {
       title: "Home",
       url: "#",
-      icon: (
-        <HomeIcon
-        />
-      ),
+      icon: <HomeIcon />,
       isActive: true,
     },
     {
       title: "Inbox",
       url: "#",
-      icon: (
-        <InboxIcon
-        />
-      ),
+      icon: <InboxIcon />,
       badge: "10",
     },
   ],
@@ -93,92 +72,112 @@ const data = {
     {
       title: "Calendar",
       url: "#",
-      icon: (
-        <CalendarIcon
-        />
-      ),
+      icon: <CalendarIcon />,
     },
     {
       title: "Settings",
       url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
+      icon: <Settings2Icon />,
     },
     {
       title: "Templates",
       url: "#",
-      icon: (
-        <BlocksIcon
-        />
-      ),
+      icon: <BlocksIcon />,
     },
     {
       title: "Trash",
       url: "#",
-      icon: (
-        <Trash2Icon
-        />
-      ),
+      icon: <Trash2Icon />,
     },
     {
       title: "Help",
       url: "#",
-      icon: (
-        <MessageCircleQuestionIcon
-        />
-      ),
+      icon: <MessageCircleQuestionIcon />,
     },
   ],
-  
-  
 }
-export function AppSidebarHistory(){
-  const [chats, setChats] = useState([]);
-  
-  useEffect(()=> {
-      fetch('/api/chat')
-        .then(resp=>resp.json())
-        .then(d=> {
-          if (Array.isArray(d)) {
-            setChats(d);
-          } else {
-            setChats([]);
-          }
-        })
-        .catch(err => {
-          console.error('Erreur:', err);
-          setChats([]);
-        });
-  }, [])
 
-  if (!Array.isArray(chats) || chats.length === 0) {
-    return null;
+export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }) {
+  const router = useRouter()
+  const [chats, setChats] = useState([])
+
+  const fetchChats = () => {
+    const url = searchQuery
+      ? `/api/chat?q=${encodeURIComponent(searchQuery)}`
+      : '/api/chat'
+
+    fetch(url)
+      .then(resp => resp.json())
+      .then(d => setChats(Array.isArray(d) ? d : []))
+      .catch(() => setChats([]))
   }
-  
-  return(
+
+  useEffect(() => {
+    fetchChats()
+
+    window.addEventListener('chat-updated', fetchChats)
+    return () => window.removeEventListener('chat-updated', fetchChats)
+  }, [searchQuery])
+
+  if (!Array.isArray(chats) || chats.length === 0) return null
+
+  return (
     <>
-     {chats.map((e) => (
-        <button key={e.id}>
-          <a href={`/dashboard/${e.id}`}>  {/* ← ICI : backticks et ${} */}
-            {e.title}
-          </a>
+      {chats.map((e) => (
+        <button
+          key={e.id}
+          onClick={() => router.push(`/dashboard/${e.id}`)}
+          className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-sidebar-accent hover:text-sidebar-accent-foreground truncate"
+        >
+          <div className="truncate font-medium">{e.title}</div>
+          {e.lastMessage && (
+            <div className="truncate text-xs text-muted-foreground">{e.lastMessage}</div>
+          )}
         </button>
-     ))}
+      ))}
     </>
   )
 }
-    
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  const handleNewChat = () => {
+    const newId = generateId()
+    router.push(`/dashboard/${newId}`)
+    setTimeout(() => window.dispatchEvent(new Event('chat-updated')), 500) // ✅ AJOUTÉ
+  }
+
+  const navMainWithActions = data.navMain.map(item => {
+    if (item.title === "Ask AI") return { ...item, onClick: handleNewChat }
+    if (item.title === "Search") return { ...item, onClick: () => setSearchOpen(v => !v) }
+    return item
+  })
+
   return (
     <Sidebar className="border-r-0" {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
-        <NavMain items={data.navMain} />
-        <AppSidebarHistory  />
+        <NavMain items={navMainWithActions} />
+
+        {searchOpen && (
+          <div className="px-2 pb-1">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Chercher une conversation..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full rounded border px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        )}
+
+        <AppSidebarHistory searchQuery={searchOpen ? searchQuery : ""} />
       </SidebarHeader>
-      
+
       <SidebarRail />
     </Sidebar>
   )

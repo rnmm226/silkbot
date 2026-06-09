@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from '@ai-sdk/react';
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect, use } from 'react';
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NavActions } from "@/components/nav-actions";
@@ -24,23 +24,59 @@ import { useRouter } from "next/navigation";
 import { DefaultChatTransport, createIdGenerator } from 'ai';
 import type { UIMessage } from 'ai';
 
-export default function DashboardPage() {
+export default function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const { data, isPending, error } = authClient.useSession();
 
-  // Générer un ID unique pour le chat si nécessaire
   const chatId = useMemo(() => {
-    // Vous pouvez utiliser l'ID de l'utilisateur ou générer un ID
-    return `chat_${data?.user?.id }`;
+    return `chat_${data?.user?.id}`;
   }, [data?.user?.id]);
 
-  // Chat state
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<FileList | undefined>(undefined);
+  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+  const [chatTitle, setChatTitle] = useState('Nouvelle conversation');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { messages, sendMessage, status, error: chatError, stop } = useChat({
-    id: chatId, // Important: définir l'ID du chat
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/chat/${id}/messages`)
+      .then(res => res.ok ? res.json() : [])
+      .then((msgs: UIMessage[]) => setInitialMessages(msgs))
+      .catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/chat/${id}/title`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.title) setChatTitle(data.title);
+      })
+      .catch(() => {});
+  }, [id]);
+
+  const handleTitleSave = async () => {
+  if (!titleInput.trim()) {
+    setIsEditingTitle(false);
+    return;
+  }
+  setChatTitle(titleInput);
+  setIsEditingTitle(false);
+  await fetch(`/api/chat/${id}/title`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: titleInput }),
+  });
+  // ✅ AJOUTÉ : notifier le sidebar de se rafraîchir
+  window.dispatchEvent(new Event('chat-updated'));
+};
+
+  const { messages: chatMessages, sendMessage, status, error: chatError, stop } = useChat({
+    id: id ?? chatId,
     generateId: createIdGenerator({
       prefix: 'msgc',
       size: 16,
@@ -56,14 +92,17 @@ export default function DashboardPage() {
         return {
           body: {
             message: msgs[msgs.length - 1],
-            id: chatId, // Envoyer l'ID du chat
+            id: id ?? chatId,
           },
         };
       },
     }),
   });
 
-  // Auth check
+  const messages = chatMessages.length > 0
+    ? chatMessages
+    : initialMessages;
+
   if (isPending) {
     return <div className="flex items-center justify-center h-screen">Chargement...</div>;
   }
@@ -138,7 +177,30 @@ export default function DashboardPage() {
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbPage className="line-clamp-1">
-                    Chat Dashboard
+                    {isEditingTitle ? (
+                      <input
+                        autoFocus
+                        value={titleInput}
+                        onChange={e => setTitleInput(e.target.value)}
+                        onBlur={handleTitleSave}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleTitleSave();
+                          if (e.key === 'Escape') setIsEditingTitle(false);
+                        }}
+                        className="bg-transparent border-b border-primary focus:outline-none text-sm w-48"
+                      />
+                    ) : (
+                      <span
+                        onClick={() => {
+                          setTitleInput(chatTitle);
+                          setIsEditingTitle(true);
+                        }}
+                        className="cursor-pointer hover:underline"
+                        title="Cliquer pour renommer"
+                      >
+                        {chatTitle}
+                      </span>
+                    )}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>

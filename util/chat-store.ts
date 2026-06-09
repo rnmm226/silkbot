@@ -11,7 +11,6 @@ export type ChatWithMessages = {
   userId?: string | null;
 };
 
-// Helper pour extraire le texte d'un message
 function getMessageText(message: UIMessage): string {
   const textPart = message.parts?.find(
     (part): part is { type: 'text'; text: string } => part.type === 'text'
@@ -19,11 +18,8 @@ function getMessageText(message: UIMessage): string {
   return textPart?.text || '';
 }
 
-// Helper pour convertir un message DB en UIMessage
 function dbMessageToUIMessage(msg: any): UIMessage {
-  // Convertir via JSON pour éviter les problèmes de types
   const parts = msg.parts ? JSON.parse(JSON.stringify(msg.parts)) as UIMessage['parts'] : [];
-  
   return {
     id: msg.id,
     role: msg.role as 'user' | 'assistant',
@@ -31,7 +27,6 @@ function dbMessageToUIMessage(msg: any): UIMessage {
   };
 }
 
-// Helper pour convertir UIMessage en format DB (sans createdAt)
 function uiMessageToDbData(msg: UIMessage, chatId: string) {
   return {
     id: msg.id,
@@ -43,7 +38,6 @@ function uiMessageToDbData(msg: UIMessage, chatId: string) {
   };
 }
 
-// ✅ Créer un nouveau chat
 export async function createChat(userId?: string): Promise<string> {
   const chat = await prisma.chat.create({
     data: {
@@ -55,7 +49,6 @@ export async function createChat(userId?: string): Promise<string> {
   return chat.id;
 }
 
-// ✅ Lire un chat avec ses messages
 export async function readChat(id: string): Promise<ChatWithMessages | null> {
   try {
     const chat = await prisma.chat.findUnique({
@@ -66,13 +59,11 @@ export async function readChat(id: string): Promise<ChatWithMessages | null> {
         },
       },
     });
-    
-    if (!chat) {
-      return null;
-    }
-    
+
+    if (!chat) return null;
+
     const uiMessages: UIMessage[] = chat.messages.map(dbMessageToUIMessage);
-    
+
     return {
       id: chat.id,
       title: chat.title,
@@ -86,37 +77,39 @@ export async function readChat(id: string): Promise<ChatWithMessages | null> {
   }
 }
 
-// ✅ Sauvegarder un chat (messages et stream)
+// ✅ userId ajouté
 export async function saveChat({
   chatId,
   messages,
   activeStreamId,
   title,
+  userId, // no longer optional
 }: {
   chatId: string;
   messages?: UIMessage[];
   activeStreamId?: string | null;
   title?: string;
+  userId: string; // ✅ required, not optional
 }): Promise<void> {
   try {
     const chat = await prisma.chat.findUnique({
       where: { id: chatId },
     });
-    
+
     if (!chat) {
       await prisma.chat.create({
         data: {
           id: chatId,
           title: title || "Nouvelle conversation",
           activeStreamId: activeStreamId || null,
+          userId: userId || null, // ✅ AJOUTÉ
         },
       });
     } else {
-      // Mettre à jour les champs du chat
       const updateData: any = {};
       if (activeStreamId !== undefined) updateData.activeStreamId = activeStreamId;
       if (title !== undefined) updateData.title = title;
-      
+
       if (Object.keys(updateData).length > 0) {
         await prisma.chat.update({
           where: { id: chatId },
@@ -124,20 +117,13 @@ export async function saveChat({
         });
       }
     }
-    
-    // Mettre à jour les messages si fournis
+
     if (messages !== undefined) {
-      // Supprimer les anciens messages
-      await prisma.message.deleteMany({
-        where: { chatId },
-      });
-      
-      // Créer les nouveaux messages
+      await prisma.message.deleteMany({ where: { chatId } });
+
       if (messages.length > 0) {
         const messagesData = messages.map(msg => uiMessageToDbData(msg, chatId));
-        await prisma.message.createMany({
-          data: messagesData,
-        });
+        await prisma.message.createMany({ data: messagesData });
       }
     }
   } catch (error) {
@@ -146,7 +132,6 @@ export async function saveChat({
   }
 }
 
-// ✅ Récupérer toutes les conversations d'un utilisateur
 export async function getUserConversations(userId: string) {
   try {
     const conversations = await prisma.chat.findMany({
@@ -162,7 +147,7 @@ export async function getUserConversations(userId: string) {
         },
       },
     });
-    
+
     return conversations.map(conv => ({
       id: conv.id,
       title: conv.title || "Nouvelle conversation",
@@ -177,14 +162,12 @@ export async function getUserConversations(userId: string) {
   }
 }
 
-// ✅ Récupérer les messages d'une conversation
 export async function getConversationMessages(chatId: string): Promise<UIMessage[]> {
   try {
     const messages = await prisma.message.findMany({
       where: { chatId },
       orderBy: { createdAt: 'asc' },
     });
-    
     return messages.map(dbMessageToUIMessage);
   } catch (error) {
     console.error('Error getting conversation messages:', error);
@@ -192,7 +175,6 @@ export async function getConversationMessages(chatId: string): Promise<UIMessage
   }
 }
 
-// ✅ Mettre à jour le titre d'une conversation
 export async function updateConversationTitle(chatId: string, title: string) {
   try {
     await prisma.chat.update({
@@ -204,7 +186,6 @@ export async function updateConversationTitle(chatId: string, title: string) {
   }
 }
 
-// ✅ Supprimer un chat (soft delete)
 export async function deleteChat(id: string): Promise<void> {
   await prisma.chat.update({
     where: { id },
@@ -212,7 +193,6 @@ export async function deleteChat(id: string): Promise<void> {
   });
 }
 
-// ✅ Supprimer définitivement un chat
 export async function deleteChatPermanently(id: string): Promise<void> {
   await prisma.chat.delete({
     where: { id },
