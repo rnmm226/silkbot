@@ -2,7 +2,6 @@
 
 import { useChat } from '@ai-sdk/react';
 import { useRef, useState, useMemo, useEffect, use } from 'react';
-import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NavActions } from "@/components/nav-actions";
 import {
@@ -91,6 +90,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (!isPending && (!data || error)) {
+      router.replace("/login");
+    }
+  }, [data, error, isPending, router]);
+
   if (isPending) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -102,7 +107,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     );
   }
 
-  if (!data || error) { router.push("/login"); return null; }
+  if (!data || error) return null;
 
   const renderPart = (part: UIMessage['parts'][number], index: number) => {
     if (part.type === 'text') {
@@ -399,7 +404,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      if (input.trim() || files?.length) handleSubmit(e );
+                      if (input.trim() || files?.length) handleSubmit(e);
                     }
                   }}
                   placeholder="Posez votre question juridique…"

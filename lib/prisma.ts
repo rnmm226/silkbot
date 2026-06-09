@@ -10,6 +10,7 @@ const adapter = new PrismaPg({
   database: process.env.DATABASE_NAME || "monapp",
 });
 
+
 // Déclaration globale pour éviter plusieurs instances
 declare global {
   var prisma: PrismaClient | undefined;

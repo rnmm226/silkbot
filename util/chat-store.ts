@@ -1,5 +1,5 @@
 // util/chat-store.ts
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/lib/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { type UIMessage } from 'ai';
 
@@ -11,6 +11,15 @@ export type ChatWithMessages = {
   userId?: string | null;
 };
 
+type StoredMessage = {
+  id: string;
+  role: string;
+  parts: Prisma.JsonValue | null;
+};
+
+const DEFAULT_CHAT_TITLE = "Nouvelle conversation";
+const MAX_GENERATED_TITLE_LENGTH = 60;
+
 function getMessageText(message: UIMessage): string {
   const textPart = message.parts?.find(
     (part): part is { type: 'text'; text: string } => part.type === 'text'
@@ -18,7 +27,19 @@ function getMessageText(message: UIMessage): string {
   return textPart?.text || '';
 }
 
-function dbMessageToUIMessage(msg: any): UIMessage {
+function getTitleFromFirstMessage(messages?: UIMessage[]): string | undefined {
+  const firstUserMessage = messages?.find((message) => message.role === 'user');
+  if (!firstUserMessage) return undefined;
+
+  const text = getMessageText(firstUserMessage).replace(/\s+/g, ' ').trim();
+  if (!text) return undefined;
+
+  if (text.length <= MAX_GENERATED_TITLE_LENGTH) return text;
+
+  return `${text.slice(0, MAX_GENERATED_TITLE_LENGTH - 3).trimEnd()}...`;
+}
+
+function dbMessageToUIMessage(msg: StoredMessage): UIMessage {
   const parts = msg.parts ? JSON.parse(JSON.stringify(msg.parts)) as UIMessage['parts'] : [];
   return {
     id: msg.id,
@@ -33,7 +54,7 @@ function uiMessageToDbData(msg: UIMessage, chatId: string) {
     chatId: chatId,
     role: msg.role,
     content: getMessageText(msg),
-    parts: msg.parts as Prisma.JsonValue,
+    parts: msg.parts as Prisma.InputJsonValue,
     createdAt: new Date(),
   };
 }
@@ -43,7 +64,7 @@ export async function createChat(userId?: string): Promise<string> {
     data: {
       activeStreamId: null,
       userId: userId || null,
-      title: "Nouvelle conversation",
+      title: DEFAULT_CHAT_TITLE,
     },
   });
   return chat.id;
@@ -83,32 +104,41 @@ export async function saveChat({
   messages,
   activeStreamId,
   title,
-  userId, // no longer optional
+  userId,
 }: {
   chatId: string;
   messages?: UIMessage[];
   activeStreamId?: string | null;
   title?: string;
-  userId: string; // ✅ required, not optional
+  userId?: string;
 }): Promise<void> {
   try {
     const chat = await prisma.chat.findUnique({
       where: { id: chatId },
     });
 
+    const generatedTitle = title ?? getTitleFromFirstMessage(messages);
+
     if (!chat) {
       await prisma.chat.create({
         data: {
           id: chatId,
-          title: title || "Nouvelle conversation",
+          title: generatedTitle || DEFAULT_CHAT_TITLE,
           activeStreamId: activeStreamId || null,
-          userId: userId || null, // ✅ AJOUTÉ
+          userId: userId || null,
         },
       });
     } else {
-      const updateData: any = {};
+      const updateData: Prisma.ChatUpdateInput = {};
       if (activeStreamId !== undefined) updateData.activeStreamId = activeStreamId;
       if (title !== undefined) updateData.title = title;
+      if (
+        title === undefined &&
+        generatedTitle &&
+        (!chat.title || chat.title === DEFAULT_CHAT_TITLE)
+      ) {
+        updateData.title = generatedTitle;
+      }
 
       if (Object.keys(updateData).length > 0) {
         await prisma.chat.update({
@@ -150,7 +180,7 @@ export async function getUserConversations(userId: string) {
 
     return conversations.map(conv => ({
       id: conv.id,
-      title: conv.title || "Nouvelle conversation",
+      title: conv.title || DEFAULT_CHAT_TITLE,
       updatedAt: conv.updatedAt,
       createdAt: conv.createdAt,
       lastMessage: conv.messages[0]?.content || "",

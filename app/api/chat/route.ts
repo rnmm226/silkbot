@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
 
         for await (const chunk of geminiStream.stream) {
           const text = chunk.text();
+          console.log(text)
           fullText += text;
 
           writer.write({

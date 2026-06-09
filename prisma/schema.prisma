@@ -95,3 +95,19 @@ model Message {
   @@index([chatId])
   @@map("messages")
 }
+
+model SourceDocument {
+  id        String                  @id @default(cuid())
+  content   String?                 @db.Text
+  segments  SourceDocumentSegment[]
+  createdAt DateTime                @default(now()) @map("created_at")
+}
+
+model SourceDocumentSegment {
+  id               String                 @id @default(cuid())
+  content          String                 @db.Text
+  sourceDocument   SourceDocument?        @relation(fields: [sourceDocumentid], references: [id])
+  sourceDocumentid String?
+  embedding        Unsupported("vector")? @map("vector")
+  createdAt        DateTime               @default(now()) @map("created_at")
+}

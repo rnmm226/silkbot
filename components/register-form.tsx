@@ -61,7 +61,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
             Créer un compte
           </CardTitle>
           <CardDescription className="text-muted-foreground font-light">
-            Rejoignez la plateforme Tunisia Law
+            Rejoignez la plateforme SilkBot
           </CardDescription>
         </CardHeader>
 

@@ -103,9 +103,9 @@ export function NavActions() {
           {/* Footer */}
           <div className="h-px bg-border/40 my-1 mx-1" />
           <div className="px-2.5 py-1.5 flex items-center justify-between">
-            <span className="text-[10px] text-muted-foreground/40 font-light">TunisiaLaw</span>
+            <span className="text-[10px] text-muted-foreground/40 font-light">SilkBot</span>
             <a
-              href="https://tunisialaw.tn"
+              href="http://localhost:3000/"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground flex items-center gap-1 transition-colors"
