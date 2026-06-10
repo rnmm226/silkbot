@@ -8,17 +8,10 @@ import { prisma } from '@/lib/prisma';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!);
 
-// 🔥 AJOUT : Définition des types (manquants)
 interface SourceDetail {
   filename: string;
   page: number | null;
   chunk_index: number;
-}
-
-interface RagResponse {
-  context: string;
-  sources: string[];
-  source_details: SourceDetail[];
 }
 
 function getMessageText(message: UIMessage): string {
@@ -28,22 +21,26 @@ function getMessageText(message: UIMessage): string {
   return textPart?.text || '';
 }
 
-// ✅ Recherche RAG avec typage correct
-async function getRagContext(question: string): Promise<RagResponse> {
+// Recherche RAG directe (sans function calling)
+async function getRagContext(question: string): Promise<{
+  context: string;
+  sources: string[];
+  source_details: SourceDetail[];
+}> {
   try {
-    const res = await fetch('http://localhost:8000/search', {
+    const response = await fetch('http://localhost:8000/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
     });
-    if (!res.ok) return { context: '', sources: [], source_details: [] };
-    const data = await res.json();
-    return {
-      context: data.context || '',
-      sources: data.sources || [],
-      source_details: data.source_details || []
-    };
-  } catch {
+
+    if (!response.ok) {
+      return { context: '', sources: [], source_details: [] };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('RAG search error:', error);
     return { context: '', sources: [], source_details: [] };
   }
 }
@@ -75,52 +72,58 @@ export async function POST(req: NextRequest) {
     messages = [...messages, newMessage];
     await saveChat({ chatId: id, messages, activeStreamId: null, userId });
 
-    // ✅ Récupérer le contexte RAG (avec source_details)
+    // 🔥 ÉTAPE 1 : Recherche RAG directe (1 appel)
     const { context, sources, source_details } = await getRagContext(messageText);
 
-    // 🔥 Construire les liens markdown AVANT de les utiliser
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    
-    const sourcesLinks = source_details.map((detail: SourceDetail) => {
-      const pageParam = detail.page ? `?page=${detail.page}` : '';
-      const encodedFilename = encodeURIComponent(detail.filename);
-      return `[${detail.filename}](${apiUrl}/document/${encodedFilename}${pageParam})`;
-    }).join(' · ');
+    // 🔥 ÉTAPE 2 : Construction du prompt système avec le format de réponse Ordalie
+    const systemPrompt =`Tu es Counsel, un assistant juridique tunisien expert.
 
-    // Fallback si pas de source_details (utilise sources simple)
-    const fallbackLinks = sources.map((filename: string) => {
-      const encodedFilename = encodeURIComponent(filename);
-      return `[${filename}](${apiUrl}/document/${encodedFilename})`;
-    }).join(' · ');
+PROCESSUS EN 3 ÉTAPES :
 
-    const finalSourcesLinks = sourcesLinks || fallbackLinks;
+ÉTAPE 1 — ANALYSE
+Analyse chaque passage fourni et décide s'il est pertinent pour la question.
+Un passage est pertinent s'il contient une règle, un article, une définition ou un fait directement lié à la question.
 
-    // ✅ Construire le system prompt
-    const systemPrompt = context
-      ? `Tu es un assistant juridique tunisien expert en droit tunisien.
+ÉTAPE 2 — RÉDACTION
+Rédige une réponse claire, structurée et professionnelle basée UNIQUEMENT sur les passages retenus.
+Si aucun passage n'est pertinent, dis-le explicitement.
 
-RÈGLES IMPORTANTES :
-1. Reformule ta réponse avec tes mots. Ne cite JAMAIS les noms de fichiers entre crochets dans ta réponse.
-2. Structure ta réponse clairement avec des titres courts (##).
-3. Sois concis et va droit au but.
+ÉTAPE 3 — TRAÇABILITÉ
+Pour chaque affirmation dans ta réponse, identifie le chunk_id source.
 
-Voici les informations juridiques :
-${context}`
-      : `Tu es un assistant juridique tunisien. Réponds de manière claire et utile.`;
+RÈGLES ABSOLUES :
+- Ne jamais inventer d'information absente des documents.
+- Ne jamais citer un chunk non pertinent.
+- Répondre en français juridique professionnel.
+- Structurer avec des titres markdown si la réponse dépasse 3 points.
 
-    // 🔥 CORRECTION : history et model étaient manquants
+FORMAT DE RÉPONSE : JSON strict (aucun texte avant ou après).`;
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemma-4-26b-a4b-it',
+      systemInstruction: systemPrompt,
+    });
+
     const history = messages.slice(0, -1).map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: getMessageText(msg) }],
     }));
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemma-4-31b-it',
-      systemInstruction: systemPrompt,
-    });
-
     const chatSession = model.startChat({ history });
     const geminiStream = await chatSession.sendMessageStream(messageText);
+
+    // 🔥 ÉTAPE 4 : Construction des liens markdown pour les sources
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    let sourcesText = '';
+    if (source_details && source_details.length) {
+      const sourcesLinks = source_details.map((detail: SourceDetail) => {
+          const pageParam = detail.page ? `?page=${detail.page}` : '';
+          return `[${detail.filename}](${apiUrl}/document/${encodeURIComponent(detail.filename)}${pageParam})`;
+      }).join(' · ');
+      sourcesText = sourcesLinks
+        ? `\n\n---\n📄 **Sources:** ${sourcesLinks}`
+        : '';
+    }
 
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
@@ -135,17 +138,13 @@ ${context}`
           writer.write({ type: 'text-delta', id: messageId, delta: text });
         }
 
-        writer.write({ type: 'text-end', id: messageId });
-
-        // ✅ Ajouter les sources à la fin avec LIENS (pas juste les noms bruts)
-        if (finalSourcesLinks) {
-          const sourcesText = `\n\n---\n📄 **Sources:** ${finalSourcesLinks}`;
-          fullText += sourcesText;
-        } else if (sources.length > 0) {
-          // Fallback si pas de liens
-          const sourcesText = `\n\n---\n📄 **Sources:** ${sources.join(' · ')}`;
+        // Ajouter les sources à la fin (avant de clore le flux)
+        if (sourcesText) {
+          writer.write({ type: 'text-delta', id: messageId, delta: sourcesText });
           fullText += sourcesText;
         }
+
+        writer.write({ type: 'text-end', id: messageId });
 
         const assistantMessage: UIMessage = {
           id: messageId,
@@ -153,7 +152,12 @@ ${context}`
           parts: [{ type: 'text', text: fullText }],
         };
 
-        await saveChat({ chatId: id, messages: [...messages, assistantMessage], activeStreamId: null, userId });
+        await saveChat({
+          chatId: id,
+          messages: [...messages, assistantMessage],
+          activeStreamId: null,
+          userId,
+        });
       },
     });
 

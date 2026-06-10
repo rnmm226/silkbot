@@ -22,7 +22,15 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { DefaultChatTransport, createIdGenerator } from 'ai';
 import type { UIMessage } from 'ai';
-import { Send, Paperclip, Square, Pencil } from 'lucide-react';
+import { Send, Paperclip, Square, Pencil, X } from 'lucide-react';
+import { PDFViewer } from "@/components/PDFViewer";
+
+// Interface pour les sources
+interface Source {
+  filename: string;
+  page?: number;
+  chunk_index?: number;
+}
 
 export default function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -37,9 +45,27 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [chatTitle, setChatTitle] = useState('Nouvelle conversation');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState('');
+  
+  // État pour le PDF sélectionné
+  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fonction pour extraire les sources d'un message
+  const parseSourcesFromMessage = (content: string): Source[] => {
+    const sources: Source[] = [];
+    const regex = /\[([^\]]+)\]\([^)]*(?:\?page=(\d+))?\)/g;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      sources.push({
+        filename: match[1],
+        page: match[2] ? parseInt(match[2]) : undefined,
+      });
+    }
+    return sources;
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -109,33 +135,71 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
   if (!data || error) return null;
 
-  const renderPart = (part: UIMessage['parts'][number], index: number) => {
+  // 🔥 FONCTION RENDER PART COMPLÈTE
+  const renderPart = (part: UIMessage['parts'][number], index: number, fullContent?: string) => {
     if (part.type === 'text') {
+      // Extraire les sources du contenu
+      const sources = parseSourcesFromMessage(part.text);
+      
       return (
-        <div key={index} className="whitespace-pre-wrap leading-relaxed text-sm">
-          {part.text}
+        <div key={index} className="space-y-3">
+          {/* Texte avec HTML (pour les details/summary) */}
+          <div 
+            className="prose prose-sm max-w-none dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: part.text }}
+          />
+          
+          {/* Afficher les sources sous forme de boutons cliquables */}
+          {sources.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-border/30">
+              <p className="text-xs text-muted-foreground mb-2">📄 Sources :</p>
+              <div className="flex flex-wrap gap-2">
+                {sources.map((source, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedSource(source)}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-1"
+                  >
+                    <span>📄</span>
+                    {source.filename}
+                    {source.page && <span className="opacity-70 text-[10px]">(p.{source.page})</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
+    
     if (part.type === 'file' && part.mediaType?.startsWith('image/')) {
       return (
         <div key={index} className="mt-2">
-          <img src={part.url} alt={part.filename ?? 'Image'}
-            className="max-w-full max-h-48 rounded-lg object-contain" />
+          <img 
+            src={part.url} 
+            alt={part.filename ?? 'Image'}
+            className="max-w-full max-h-48 rounded-lg object-contain" 
+          />
           <div className="text-xs mt-1 opacity-50 font-light">📎 {part.filename}</div>
         </div>
       );
     }
+    
     if (part.type === 'file') {
       return (
         <div key={index} className="mt-2">
-          <a href={part.url} target="_blank" rel="noopener noreferrer"
-            className="text-accent hover:underline text-sm">
+          <a 
+            href={part.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-accent hover:underline text-sm"
+          >
             📎 {part.filename ?? 'Télécharger le fichier'}
           </a>
         </div>
       );
     }
+    
     return null;
   };
 
@@ -157,11 +221,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       <AppSidebar />
       <SidebarInset>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/40 bg-background/80 backdrop-blur-sm px-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground shrink-0" />
-          <Separator orientation="vertical" className="h-4 opacity-30 data-vertical:h-4 data-vertical:self-auto" />
-
+          <Separator orientation="vertical" className="h-4 opacity-30" />
           <Breadcrumb className="flex-1 min-w-0">
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -182,7 +245,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     <button
                       onClick={() => { setTitleInput(chatTitle); setIsEditingTitle(true); }}
                       className="flex items-center gap-1.5 group hover:text-foreground text-foreground/70 transition-colors"
-                      title="Renommer la conversation"
                     >
                       <span className="font-medium text-sm font-sans truncate max-w-[200px]">{chatTitle}</span>
                       <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />
@@ -192,7 +254,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <span className="hidden sm:block text-xs text-muted-foreground font-light">
               {data?.user?.name}
@@ -210,10 +271,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           </div>
         </header>
 
-        {/* ── Chat layout ── */}
+        {/* Chat layout */}
         <div className="flex flex-col h-[calc(100vh-3.5rem)]">
 
-          {/* ── Chat sub-header ── */}
+          {/* Chat sub-header */}
           <div className="border-b border-border/30 px-6 py-3 flex items-center gap-3 bg-background">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <span className="text-sm text-primary">⚖</span>
@@ -232,7 +293,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
-          {/* ── Messages area ── */}
+          {/* Messages area */}
           <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
 
             {/* Empty state */}
@@ -250,7 +311,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 <p className="text-sm text-muted-foreground font-light max-w-xs leading-relaxed">
                   Posez votre question juridique. Je vous réponds avec des sources officielles tunisiennes.
                 </p>
-                {/* Suggestion chips */}
                 <div className="flex flex-wrap gap-2 justify-center mt-6 max-w-sm">
                   {[
                     "Comment créer une SARL ?",
@@ -279,7 +339,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   animation: `msgIn 0.4s cubic-bezier(0.22,1,0.36,1) ${i < 3 ? i * 60 : 0}ms both`,
                 }}
               >
-                {/* Assistant avatar */}
                 {message.role === 'assistant' && (
                   <div className="w-7 h-7 rounded-lg bg-primary/10 border border-border/30 flex items-center justify-center shrink-0 mt-0.5">
                     <span className="text-xs text-primary">⚖</span>
@@ -294,11 +353,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   }`}
                 >
                   <div className="px-4 py-3">
-                    {message.parts.map((part, index) => renderPart(part, index))}
+                    {message.parts.map((part, index) => renderPart(part, index, message.content))}
                   </div>
                 </div>
 
-                {/* User avatar */}
                 {message.role === 'user' && (
                   <div className="w-7 h-7 rounded-lg bg-muted border border-border/30 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-medium text-muted-foreground">
                     {initials}
@@ -309,10 +367,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
             {/* Typing indicator */}
             {(status === 'submitted' || status === 'streaming') && (
-              <div
-                className="flex gap-3 justify-start"
-                style={{ animation: 'msgIn 0.3s ease both' }}
-              >
+              <div className="flex gap-3 justify-start" style={{ animation: 'msgIn 0.3s ease both' }}>
                 <div className="w-7 h-7 rounded-lg bg-primary/10 border border-border/30 flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-xs text-primary">⚖</span>
                 </div>
@@ -337,14 +392,14 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ── Error ── */}
+          {/* Error */}
           {chatError && (
             <div className="mx-4 mb-3 bg-destructive/8 border border-destructive/20 rounded-xl p-3">
               <p className="text-destructive text-xs font-sans">Erreur : {chatError.message}</p>
             </div>
           )}
 
-          {/* ── Files preview ── */}
+          {/* Files preview */}
           {files && files.length > 0 && (
             <div className="mx-4 mb-2 flex gap-2 p-2 bg-muted/40 rounded-xl overflow-x-auto border border-border/30">
               {Array.from(files).map((file, index) => (
@@ -358,7 +413,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             </div>
           )}
 
-          {/* ── Input ── */}
+          {/* Input */}
           <div className="px-4 pb-4 pt-2">
             <style>{`
               @keyframes msgIn {
@@ -376,8 +431,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             `}</style>
             <form onSubmit={handleSubmit}>
               <div className="flex items-end gap-2 bg-card border border-border/50 rounded-2xl px-4 py-3 shadow-xs focus-within:border-accent/40 focus-within:shadow-sm transition-all duration-200">
-
-                {/* Attach */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -391,8 +444,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   onChange={(e) => { if (e.target.files) setFiles(e.target.files); }}
                   multiple ref={fileInputRef} className="hidden"
                 />
-
-                {/* Textarea */}
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -412,8 +463,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   rows={1}
                   className="flex-1 bg-transparent focus:outline-none disabled:opacity-40 text-sm font-sans text-foreground placeholder:text-muted-foreground/50 resize-none leading-relaxed"
                 />
-
-                {/* Stop / Send */}
                 {(status === 'submitted' || status === 'streaming') ? (
                   <button
                     type="button"
@@ -442,6 +491,33 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
         </div>
       </SidebarInset>
+
+      {/* Modal PDF */}
+      {selectedSource && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border/40">
+              <h3 className="font-medium text-sm">
+                📄 {selectedSource.filename}
+                {selectedSource.page && <span className="text-muted-foreground ml-2">Page {selectedSource.page}</span>}
+              </h3>
+              <button
+                onClick={() => setSelectedSource(null)}
+                className="p-1 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <PDFViewer 
+                filename={selectedSource.filename} 
+                initialPage={selectedSource.page}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </SidebarProvider>
   );
 }

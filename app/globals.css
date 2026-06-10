@@ -237,3 +237,83 @@
     font-family: var(--font-serif);
   }
 }
+/* Sections pliables compactes - comme dans la photo */
+.prose details {
+  margin: 0.25rem 0;
+  border: none;
+  background: transparent;
+  font-size: 0.7rem;
+}
+
+.prose details summary {
+  padding: 0.2rem 0;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.7rem;
+  background: transparent;
+  color: #64748b;
+  list-style: none;
+  display: inline-block;
+}
+
+.prose details summary::-webkit-details-marker {
+  display: none;
+}
+
+.prose details summary::before {
+  content: '▶';
+  font-size: 0.6rem;
+  display: inline-block;
+  transition: transform 0.15s;
+  margin-right: 0.3rem;
+  color: #94a3b8;
+}
+
+.prose details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.prose details summary:hover {
+  color: #3b82f6;
+}
+
+.prose details > :not(summary) {
+  padding: 0.3rem 0 0.3rem 1rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  background: #f8fafc;
+  border-left: 2px solid #e2e8f0;
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Titres de section dans le corps */
+.prose h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  color: #1e293b;
+}
+
+/* Listes compactes */
+.prose ul {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.prose li {
+  margin: 0.1rem 0;
+  font-size: 0.8rem;
+}
+
+/* Mode sombre */
+.dark .prose details > :not(summary) {
+  background: #0f172a;
+  border-left-color: #334155;
+}
+
+.dark .prose h3 {
+  color: #e2e8f0;
+}
