@@ -1,18 +1,49 @@
 // app/api/chat/route.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readChat, saveChat, getUserConversations } from '@/util/chat-store';
-import { generateId, type UIMessage, createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import { generateId, type UIMessage } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY!);
 
-interface SourceDetail {
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
+interface RagChunk {
+  chunk_id: string;
   filename: string;
   page: number | null;
-  chunk_index: number;
+  content: string;
+  similarity: number;
 }
+
+interface UsedSource {
+  chunk_id: string;
+  filename: string;
+  page: number | null;
+  excerpt: string;
+}
+
+interface ThinkingSummary {
+  chunks_analyzed: number;
+  chunks_retained: number;
+  documents_consulted: string[];
+  documents_retained: string[];
+  steps: string[];
+}
+
+interface GeminiStructuredResponse {
+  thinking_summary: ThinkingSummary;
+  answer: string;
+  used_sources: UsedSource[];
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
 
 function getMessageText(message: UIMessage): string {
   const textPart = message.parts?.find(
@@ -21,39 +52,164 @@ function getMessageText(message: UIMessage): string {
   return textPart?.text || '';
 }
 
-// Recherche RAG directe (sans function calling)
-async function getRagContext(question: string): Promise<{
-  context: string;
-  sources: string[];
-  source_details: SourceDetail[];
-}> {
+// ─────────────────────────────────────────────
+// RAG Search
+// ─────────────────────────────────────────────
+
+async function getRagChunks(question: string): Promise<RagChunk[]> {
   try {
     const response = await fetch('http://localhost:8000/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
     });
-
-    if (!response.ok) {
-      return { context: '', sources: [], source_details: [] };
-    }
-
-    return await response.json();
+    if (!response.ok) return [];
+    const data = await response.json();
+    // Supporte les deux formats : { chunks: [...] } ou { context, sources }
+    return data.chunks || [];
   } catch (error) {
     console.error('RAG search error:', error);
-    return { context: '', sources: [], source_details: [] };
+    return [];
   }
 }
+
+// ─────────────────────────────────────────────
+// Prompt builder
+// ─────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `Tu es Counsel, un assistant juridique tunisien expert.
+
+PROCESSUS EN 3 ÉTAPES OBLIGATOIRES :
+
+ÉTAPE 1 — ANALYSE
+Pour chaque passage, décide s'il est pertinent.
+Un passage est pertinent s'il contient une règle, un article, une définition ou un fait directement lié à la question.
+
+ÉTAPE 2 — RÉDACTION
+Rédige une réponse claire, structurée et professionnelle UNIQUEMENT à partir des passages retenus.
+Si aucun passage n'est pertinent, indique-le explicitement.
+
+ÉTAPE 3 — TRAÇABILITÉ
+Pour chaque information utilisée, identifie le chunk_id source exact.
+N'inclus dans used_sources QUE les chunks réellement cités dans ta réponse.
+
+RÈGLES ABSOLUES :
+- Ne jamais inventer d'information absente des documents.
+- Ne jamais inclure un chunk non pertinent dans used_sources.
+- Répondre en français juridique professionnel.
+- Structurer avec des titres markdown (##) si la réponse dépasse 3 points.
+
+FORMAT DE RÉPONSE : JSON strict uniquement — aucun texte avant ou après les accolades.`;
+
+function buildUserPrompt(question: string, chunks: RagChunk[]): string {
+  if (chunks.length === 0) {
+    return `QUESTION: ${question}
+
+PASSAGES DISPONIBLES: Aucun passage trouvé dans la base documentaire.
+
+Réponds UNIQUEMENT en JSON valide:
+{
+  "thinking_summary": {
+    "chunks_analyzed": 0,
+    "chunks_retained": 0,
+    "documents_consulted": [],
+    "documents_retained": [],
+    "steps": ["Aucun document pertinent trouvé"]
+  },
+  "answer": "Je n'ai pas trouvé de documents pertinents dans la base juridique pour répondre à cette question.",
+  "used_sources": []
+}`;
+  }
+
+  const chunksText = chunks
+    .map(
+      (c, i) => `[PASSAGE ${i + 1}]
+chunk_id: ${c.chunk_id}
+fichier: ${c.filename}
+page: ${c.page ?? 'N/A'}
+similarité: ${c.similarity.toFixed(2)}
+---
+${c.content}
+---`
+    )
+    .join('\n\n');
+
+  return `QUESTION: ${question}
+
+PASSAGES DISPONIBLES (${chunks.length} passages, triés par pertinence):
+
+${chunksText}
+
+Réponds UNIQUEMENT en JSON valide selon ce schéma exact (aucun texte avant ou après):
+{
+  "thinking_summary": {
+    "chunks_analyzed": ${chunks.length},
+    "chunks_retained": <nombre de passages retenus>,
+    "documents_consulted": [<liste des fichiers présents dans les passages>],
+    "documents_retained": [<liste des fichiers réellement utilisés>],
+    "steps": [<liste de 3-5 étapes courtes décrivant le raisonnement, ex: "Analyse des ${chunks.length} passages disponibles">]
+  },
+  "answer": "<réponse markdown complète>",
+  "used_sources": [
+    {
+      "chunk_id": "<chunk_id exact>",
+      "filename": "<nom du fichier>",
+      "page": <numéro de page ou null>,
+      "excerpt": "<extrait de 15-30 mots du passage utilisé>"
+    }
+  ]
+}`;
+}
+
+// ─────────────────────────────────────────────
+// JSON parser avec fallback
+// ─────────────────────────────────────────────
+
+function parseGeminiResponse(rawText: string, chunks: RagChunk[]): GeminiStructuredResponse {
+  try {
+    // Nettoyer les balises markdown
+    const clean = rawText
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    // Extraire le JSON si du texte parasite précède
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON found');
+
+    const parsed = JSON.parse(jsonMatch[0]) as GeminiStructuredResponse;
+
+    // Validation minimale
+    if (!parsed.answer || !parsed.thinking_summary) throw new Error('Invalid structure');
+
+    return parsed;
+  } catch (e) {
+    console.warn('JSON parse failed, using fallback:', e);
+    // Fallback : réponse brute sans structure
+    return {
+      thinking_summary: {
+        chunks_analyzed: chunks.length,
+        chunks_retained: 0,
+        documents_consulted: [...new Set(chunks.map(c => c.filename))],
+        documents_retained: [],
+        steps: ['Analyse effectuée', 'Format de réponse inattendu'],
+      },
+      answer: rawText,
+      used_sources: [],
+    };
+  }
+}
+
+// ─────────────────────────────────────────────
+// POST — Réponse structurée (pas de streaming)
+// ─────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
     const { message, id } = await req.json();
 
     if (!id || !message) {
-      return new Response(
-        JSON.stringify({ error: 'Chat ID and message required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return NextResponse.json({ error: 'Chat ID and message required' }, { status: 400 });
     }
 
     const session = await auth.api.getSession({ headers: req.headers });
@@ -61,47 +217,26 @@ export async function POST(req: NextRequest) {
 
     const chat = await readChat(id);
     let messages = chat?.messages || [];
-
     const messageText = getMessageText(message);
+
     const newMessage: UIMessage = {
       id: message.id || generateId(),
       role: 'user',
       parts: [{ type: 'text', text: messageText }],
     };
-
     messages = [...messages, newMessage];
     await saveChat({ chatId: id, messages, activeStreamId: null, userId });
 
-    // 🔥 ÉTAPE 1 : Recherche RAG directe (1 appel)
-    const { context, sources, source_details } = await getRagContext(messageText);
+    // ── 1. Recherche RAG ──
+    const chunks = await getRagChunks(messageText);
 
-    // 🔥 ÉTAPE 2 : Construction du prompt système avec le format de réponse Ordalie
-    const systemPrompt =`Tu es Counsel, un assistant juridique tunisien expert.
+    // ── 2. Construire prompt ──
+    const userPrompt = buildUserPrompt(messageText, chunks);
 
-PROCESSUS EN 3 ÉTAPES :
-
-ÉTAPE 1 — ANALYSE
-Analyse chaque passage fourni et décide s'il est pertinent pour la question.
-Un passage est pertinent s'il contient une règle, un article, une définition ou un fait directement lié à la question.
-
-ÉTAPE 2 — RÉDACTION
-Rédige une réponse claire, structurée et professionnelle basée UNIQUEMENT sur les passages retenus.
-Si aucun passage n'est pertinent, dis-le explicitement.
-
-ÉTAPE 3 — TRAÇABILITÉ
-Pour chaque affirmation dans ta réponse, identifie le chunk_id source.
-
-RÈGLES ABSOLUES :
-- Ne jamais inventer d'information absente des documents.
-- Ne jamais citer un chunk non pertinent.
-- Répondre en français juridique professionnel.
-- Structurer avec des titres markdown si la réponse dépasse 3 points.
-
-FORMAT DE RÉPONSE : JSON strict (aucun texte avant ou après).`;
-
+    // ── 3. Appel Gemini ──
     const model = genAI.getGenerativeModel({
-      model: 'gemma-4-26b-a4b-it',
-      systemInstruction: systemPrompt,
+      model: 'gemini-2.5-flash',
+      systemInstruction: SYSTEM_PROMPT,
     });
 
     const history = messages.slice(0, -1).map(msg => ({
@@ -110,67 +245,37 @@ FORMAT DE RÉPONSE : JSON strict (aucun texte avant ou après).`;
     }));
 
     const chatSession = model.startChat({ history });
-    const geminiStream = await chatSession.sendMessageStream(messageText);
+    const result = await chatSession.sendMessage(userPrompt);
+    const rawText = result.response.text();
 
-    // 🔥 ÉTAPE 4 : Construction des liens markdown pour les sources
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    let sourcesText = '';
-    if (source_details && source_details.length) {
-      const sourcesLinks = source_details.map((detail: SourceDetail) => {
-          const pageParam = detail.page ? `?page=${detail.page}` : '';
-          return `[${detail.filename}](${apiUrl}/document/${encodeURIComponent(detail.filename)}${pageParam})`;
-      }).join(' · ');
-      sourcesText = sourcesLinks
-        ? `\n\n---\n📄 **Sources:** ${sourcesLinks}`
-        : '';
-    }
+    // ── 4. Parser la réponse ──
+    const parsed = parseGeminiResponse(rawText, chunks);
 
-    const stream = createUIMessageStream({
-      execute: async ({ writer }) => {
-        let fullText = '';
-        const messageId = generateId();
-
-        writer.write({ type: 'text-start', id: messageId });
-
-        for await (const chunk of geminiStream.stream) {
-          const text = chunk.text();
-          fullText += text;
-          writer.write({ type: 'text-delta', id: messageId, delta: text });
-        }
-
-        // Ajouter les sources à la fin (avant de clore le flux)
-        if (sourcesText) {
-          writer.write({ type: 'text-delta', id: messageId, delta: sourcesText });
-          fullText += sourcesText;
-        }
-
-        writer.write({ type: 'text-end', id: messageId });
-
-        const assistantMessage: UIMessage = {
-          id: messageId,
-          role: 'assistant',
-          parts: [{ type: 'text', text: fullText }],
-        };
-
-        await saveChat({
-          chatId: id,
-          messages: [...messages, assistantMessage],
-          activeStreamId: null,
-          userId,
-        });
-      },
+    // ── 5. Sauvegarder ──
+    const assistantMessage: UIMessage = {
+      id: generateId(),
+      role: 'assistant',
+      parts: [{ type: 'text', text: parsed.answer }],
+    };
+    await saveChat({
+      chatId: id,
+      messages: [...messages, assistantMessage],
+      activeStreamId: null,
+      userId,
     });
 
-    return createUIMessageStreamResponse({ stream });
+    // ── 6. Retourner la réponse structurée complète ──
+    return NextResponse.json(parsed);
 
   } catch (error) {
     console.error('Chat API error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Error processing request' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
+
+// ─────────────────────────────────────────────
+// GET — Conversations
+// ─────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
