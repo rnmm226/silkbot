@@ -1,4 +1,4 @@
-// app/api/admin/document-ref/upload/route.ts
+// app/api/admin/documents/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 
@@ -20,36 +20,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Format non supporté (PDF, TXT, MD uniquement)' }, { status: 400 });
   }
 
-  // ✅ Vérifier que Python tourne
-  try {
-    const pythonFormData = new FormData();
-    pythonFormData.append('file', file);
+  // Envoie le fichier au microservice Python pour indexation
+  const pythonFormData = new FormData();
+  pythonFormData.append('file', file);
 
-    const response = await fetch('http://localhost:8000/upload', {
-      method: 'POST',
-      body: pythonFormData,
-    });
+  const response = await fetch('http://localhost:8000/upload', {
+    method: 'POST',
+    body: pythonFormData,
+  });
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Python error:', error);
-      return NextResponse.json({ error: error.detail || "Erreur lors de l'indexation" }, { status: 500 });
-    }
-
-    const result = await response.json();
-    return NextResponse.json(result);
-
-  } catch (err: any) {
-    // ✅ Affiche l'erreur exacte dans la console Next.js
-    console.error('Upload fetch error:', err.message);
-
-    if (err.message?.includes('ECONNREFUSED')) {
-      return NextResponse.json(
-        { error: 'Le microservice Python est arrêté. Lance uvicorn sur le port 8000.' },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  if (!response.ok) {
+    const error = await response.json();
+    return NextResponse.json({ error: error.detail || 'Erreur lors de l\'indexation' }, { status: 500 });
   }
+
+  const result = await response.json();
+  return NextResponse.json(result);
 }

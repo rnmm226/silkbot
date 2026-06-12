@@ -1,492 +1,904 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  Copy,
+  Database,
+  Eye,
+  FileText,
+  Filter,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  UserCheck,
+  UserX,
+  Users,
+  X,
+} from "lucide-react";
 
-interface Document {
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+type DocumentItem = {
   id: string;
   filename: string;
   segmentCount: number;
   createdAt: string;
+};
+
+type AccountItem = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image: string | null;
+  createdAt: string;
+  updatedAt: string;
+  accountCount: number;
+  chatCount: number;
+  sessionCount: number;
+  isCurrentUser: boolean;
+};
+
+type Notice = {
+  message: string;
+  type: "success" | "error";
+};
+
+type FileFilter = "all" | "pdf" | "text";
+
+const acceptedTypes = ["application/pdf", "text/plain", "text/markdown"];
+
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("fr-TN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(date));
 }
 
-type Modal =
-  | { type: 'rename'; doc: Document }
-  | { type: 'delete'; doc: Document }
-  | { type: 'segments'; doc: Document; segments: string[] }
-  | null;
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} o`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} Ko`;
+  return `${(size / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+function getDocumentType(filename: string) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".txt") || lower.endsWith(".md")) return "text";
+  return "all";
+}
 
 export default function AdminDocumentsPage() {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
+  const [segments, setSegments] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [accountQuery, setAccountQuery] = useState("");
+  const [filter, setFilter] = useState<FileFilter>("all");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [actionId, setActionId] = useState<string | null>(null);
-  const [modal, setModal] = useState<Modal>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingAccountId, setUpdatingAccountId] = useState<string | null>(null);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [selectedFileSize, setSelectedFileSize] = useState("aucun fichier");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  const showNotice = useCallback((message: string, type: Notice["type"]) => {
+    setNotice({ message, type });
+    window.setTimeout(() => setNotice(null), 3500);
+  }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async (silent = false) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      const res = await fetch('/api/admin/document-ref');
-      const data = await res.json();
-      setDocuments(data);
-    } catch {
-      showToast('Erreur lors du chargement', 'error');
+      const response = await fetch("/api/admin/document-ref");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Chargement impossible");
+      setDocuments(Array.isArray(data) ? data : []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de chargement";
+      showNotice(message, "error");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [showNotice]);
 
-  useEffect(() => { fetchDocuments(); }, []);
-
-  // ── CREATE ──────────────────────────────────────────────
-  const handleUpload = async (file: File) => {
-    const allowed = ['application/pdf', 'text/plain', 'text/markdown'];
-    if (!allowed.includes(file.type)) {
-      showToast('Format non supporté (PDF, TXT, MD uniquement)', 'error');
-      return;
-    }
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+  const fetchAccounts = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/document-ref/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      showToast(`✅ ${data.filename} indexé — ${data.chunks} segments`, 'success');
-      fetchDocuments();
-    } catch (err: any) {
-      showToast(err.message || "Erreur lors de l'upload", 'error');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      const response = await fetch("/api/admin/accounts");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Comptes indisponibles");
+      setAccounts(Array.isArray(data) ? data : []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de chargement des comptes";
+      showNotice(message, "error");
     }
-  };
+  }, [showNotice]);
 
-  // ── READ segments ────────────────────────────────────────
-  const handleViewSegments = async (doc: Document) => {
-    setActionId(doc.id);
-    try {
-      const res = await fetch(`/api/admin/document-ref/${doc.id}/segments`);
-      const data = await res.json();
-      setModal({ type: 'segments', doc, segments: data.segments });
-    } catch {
-      showToast('Erreur lors du chargement des segments', 'error');
-    } finally {
-      setActionId(null);
-    }
-  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchDocuments();
+      void fetchAccounts();
+    }, 0);
 
-  // ── UPDATE ───────────────────────────────────────────────
-  const handleRenameOpen = (doc: Document) => {
-    setRenameValue(doc.filename);
-    setModal({ type: 'rename', doc });
-  };
+    return () => window.clearTimeout(timer);
+  }, [fetchAccounts, fetchDocuments]);
 
-  const handleRenameConfirm = async () => {
-    if (modal?.type !== 'rename') return;
-    if (!renameValue.trim() || renameValue === modal.doc.filename) {
-      setModal(null);
-      return;
-    }
-    setActionId(modal.doc.id);
-    try {
-      const res = await fetch('/api/admin/document-ref', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: modal.doc.id, filename: renameValue }),
-      });
-      if (!res.ok) throw new Error('Erreur lors du renommage');
-      setDocuments(prev =>
-        prev.map(d => d.id === modal.doc.id ? { ...d, filename: renameValue } : d)
-      );
-      showToast('Document renommé', 'success');
-      setModal(null);
-    } catch (err: any) {
-      showToast(err.message, 'error');
-    } finally {
-      setActionId(null);
-    }
-  };
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((document) => {
+      const matchesQuery =
+        document.filename.toLowerCase().includes(query.toLowerCase()) ||
+        document.id.toLowerCase().includes(query.toLowerCase());
+      const type = getDocumentType(document.filename);
+      const matchesFilter = filter === "all" || type === filter;
+      return matchesQuery && matchesFilter;
+    });
+  }, [documents, filter, query]);
 
-  // ── DELETE ───────────────────────────────────────────────
-  const handleDeleteConfirm = async () => {
-    if (modal?.type !== 'delete') return;
-    setActionId(modal.doc.id);
-    try {
-      const res = await fetch('/api/admin/document-ref', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: modal.doc.id }),
-      });
-      if (!res.ok) throw new Error('Erreur lors de la suppression');
-      setDocuments(prev => prev.filter(d => d.id !== modal.doc.id));
-      showToast(`"${modal.doc.filename}" supprimé`, 'success');
-      setModal(null);
-    } catch (err: any) {
-      showToast(err.message, 'error');
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const filtered = documents.filter(d =>
-    d.filename.toLowerCase().includes(search.toLowerCase())
+  const totalSegments = useMemo(
+    () => documents.reduce((total, document) => total + document.segmentCount, 0),
+    [documents],
   );
 
-  const formatDate = (s: string) =>
-    new Date(s).toLocaleDateString('fr-TN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const latestDocument = documents[0];
 
-  const totalSegments = documents.reduce((a, d) => a + d.segmentCount, 0);
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const search = accountQuery.toLowerCase();
+      return (
+        account.name.toLowerCase().includes(search) ||
+        account.email.toLowerCase().includes(search) ||
+        account.id.toLowerCase().includes(search)
+      );
+    });
+  }, [accountQuery, accounts]);
+
+  const verifiedAccounts = useMemo(
+    () => accounts.filter((account) => account.emailVerified).length,
+    [accounts],
+  );
+
+  const uploadFile = async (file: File) => {
+    if (!acceptedTypes.includes(file.type)) {
+      showNotice("Format non supporte. Utilisez PDF, TXT ou Markdown.", "error");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    setSelectedFileSize(formatFileSize(file.size));
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/admin/document-ref/upload");
+
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      setUploadProgress(Math.round((event.loaded / event.total) * 100));
+    };
+
+    request.onload = async () => {
+      setUploading(false);
+      setUploadProgress(100);
+
+      let body: { error?: string; filename?: string; chunks?: number } = {};
+      try {
+        body = JSON.parse(request.responseText);
+      } catch {
+        body = {};
+      }
+
+      if (request.status < 200 || request.status >= 300) {
+        showNotice(body.error || "Erreur pendant l'indexation", "error");
+        return;
+      }
+
+      showNotice(
+        `${body.filename || file.name} indexe avec succes`,
+        "success",
+      );
+      await fetchDocuments(true);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    request.onerror = () => {
+      setUploading(false);
+      showNotice("Connexion impossible pendant l'upload", "error");
+    };
+
+    request.send(formData);
+  };
+
+  const loadSegments = async (document: DocumentItem) => {
+    setSelectedDocument(document);
+    setSegments([]);
+    setSegmentsLoading(true);
+
+    try {
+      const response = await fetch(`/api/admin/document-ref/${document.id}/segments`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Segments indisponibles");
+      setSegments(Array.isArray(data.segments) ? data.segments : []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de lecture";
+      showNotice(message, "error");
+    } finally {
+      setSegmentsLoading(false);
+    }
+  };
+
+  const deleteDocument = async (document: DocumentItem) => {
+    const confirmed = window.confirm(
+      `Supprimer "${document.filename}" et ses ${document.segmentCount} segments ?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(document.id);
+
+    try {
+      const response = await fetch("/api/admin/document-ref", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: document.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Suppression impossible");
+
+      setDocuments((current) => current.filter((item) => item.id !== document.id));
+      if (selectedDocument?.id === document.id) {
+        setSelectedDocument(null);
+        setSegments([]);
+      }
+      showNotice("Document supprime", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de suppression";
+      showNotice(message, "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const copyId = async (id: string) => {
+    await navigator.clipboard.writeText(id);
+    showNotice("Identifiant copie", "success");
+  };
+
+  const toggleAccountVerification = async (account: AccountItem) => {
+    setUpdatingAccountId(account.id);
+
+    try {
+      const response = await fetch("/api/admin/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: account.id,
+          emailVerified: !account.emailVerified,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Modification impossible");
+
+      setAccounts((current) =>
+        current.map((item) =>
+          item.id === account.id
+            ? { ...item, emailVerified: !account.emailVerified }
+            : item,
+        ),
+      );
+      showNotice("Statut email mis a jour", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de modification";
+      showNotice(message, "error");
+    } finally {
+      setUpdatingAccountId(null);
+    }
+  };
+
+  const deleteAccount = async (account: AccountItem) => {
+    const confirmed = window.confirm(
+      `Supprimer le compte "${account.email}" ? Ses conversations seront detachees.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingAccountId(account.id);
+
+    try {
+      const response = await fetch("/api/admin/accounts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: account.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Suppression impossible");
+
+      setAccounts((current) => current.filter((item) => item.id !== account.id));
+      showNotice("Compte supprime", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur de suppression";
+      showNotice(message, "error");
+    } finally {
+      setDeletingAccountId(null);
+    }
+  };
 
   return (
-    <div  className="min-h-screen bg-background text-foreground p-8">
-
-      {/* ── Toast ── */}
-      {toast && (
-  <div
-    className={`
-      fixed top-6 right-6 z-50
-      rounded-lg border px-5 py-3
-      text-sm shadow-lg animate-fadeIn
-      ${
-        toast.type === 'success'
-          ? 'bg-card border-border text-primary'
-          : 'bg-destructive/10 border-destructive text-destructive'
-      }
-    `}
-  >
-    {toast.message}
-  </div>
-)}
-
-      {/* ── Modal ── */}
-      {modal && (
-  <div
-    onClick={() => setModal(null)}
-    className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 animate-fadeIn"
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className={`
-        rounded-xl border border-border bg-card
-        p-7 shadow-2xl animate-scaleIn
-        max-h-[80vh] max-w-[95vw] overflow-auto
-        ${modal.type === 'segments' ? 'w-[680px]' : 'w-[420px]'}
-      `}
-    >
-          
-            {/* Rename modal */}
-            {modal.type === 'rename' && (
-  <>
-    <h3 className="mb-5 font-serif text-xl font-semibold text-foreground">
-      Renommer le document
-    </h3>
-
-    <input
-      autoFocus
-      value={renameValue}
-      onChange={(e) => setRenameValue(e.target.value)}
-      onKeyDown={(e) =>
-        e.key === 'Enter' && handleRenameConfirm()
-      }
-      className="
-        w-full rounded-lg border border-input
-        bg-background px-4 py-3
-        text-sm text-foreground
-        outline-none transition-colors
-        placeholder:text-muted-foreground
-        focus:border-ring focus:ring-2 focus:ring-ring/30
-      "
-    />
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setModal(null)} style={btnStyle('ghost')}>Annuler</button>
-                  <button
-                    onClick={handleRenameConfirm}
-                    disabled={!!actionId}
-                    style={btnStyle('primary')}
-                  >
-                    {actionId ? '...' : 'Renommer'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Delete modal */}
-            {modal.type === 'delete' && (
-              <>
-                <h3 style={{ fontFamily: 'Playfair Display, serif', margin: '0 0 0.75rem', fontSize: '1.2rem' }}>
-                  Supprimer le document
-                </h3>
-                <p style={{ color: '#8a7f72', margin: '0 0 1.5rem', lineHeight: 1.6 }}>
-                  Voulez-vous vraiment supprimer <strong style={{ color: '#e8e0d0' }}>"{modal.doc.filename}"</strong> et ses{' '}
-                  <strong style={{ color: 'var(--color-primary, #c4956a)' }}>{modal.doc.segmentCount} segments</strong> ?
-                  Cette action est irréversible.
-                </p>
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setModal(null)} style={btnStyle('ghost')}>Annuler</button>
-                  <button
-                    onClick={handleDeleteConfirm}
-                    disabled={!!actionId}
-                    style={btnStyle('danger')}
-                  >
-                    {actionId ? '...' : 'Supprimer'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Segments modal */}
-            {modal.type === 'segments' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                  <div>
-                    <h3 style={{ fontFamily: 'Playfair Display, serif', margin: '0 0 0.25rem', fontSize: '1.2rem' }}>
-                      Segments indexés
-                    </h3>
-                    <div style={{ color: '#6b6058', fontSize: '0.85rem' }}>{modal.doc.filename}</div>
-                  </div>
-                  <span style={{
-                    background: 'rgba(196, 149, 106, 0.1)', color: 'var(--color-primary, #c4956a)',
-                    padding: '0.2rem 0.7rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600,
-                  }}>
-                    {modal.segments.length} segments
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {modal.segments.map((seg, i) => (
-                    <div key={i} style={{
-                      background: '#0f0e0c', border: '1px solid #2a2520', borderRadius: '8px',
-                      padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#a09890',
-                      lineHeight: 1.6,
-                    }}>
-                      <span style={{ color: '#4a4540', marginRight: '0.5rem', fontSize: '0.75rem' }}>#{i + 1}</span>
-                      {seg}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-                  <button onClick={() => setModal(null)} style={btnStyle('ghost')}>Fermer</button>
-                </div>
-              </>
-            )}
-          </div>
+    <main className="min-h-screen bg-background text-foreground">
+      {notice && (
+        <div
+          className={cn(
+            "fixed right-4 top-4 z-50 flex max-w-sm animate-fadeUp items-center gap-2 rounded-lg border bg-popover px-3 py-2 text-sm shadow-lg",
+            notice.type === "success"
+              ? "border-primary/25 text-foreground"
+              : "border-destructive/25 text-destructive",
+          )}
+        >
+          {notice.type === "success" ? (
+            <CheckCircle2 className="size-4 text-primary" />
+          ) : (
+            <AlertCircle className="size-4" />
+          )}
+          <span>{notice.message}</span>
         </div>
       )}
 
-      {/* ── Page ── */}
-      <div style={{ maxWidth: '960px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ marginBottom: '2.5rem' }}>
-          <div style={{
-            fontSize: '0.72rem', letterSpacing: '0.15em', textTransform: 'uppercase',
-            color: 'var(--color-primary, #c4956a)', marginBottom: '0.4rem',
-          }}>
-            Administration · TunisiaLaw
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-3 animate-fadeUp sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Administration
+            </p>
+            <h1 className="font-serif text-3xl font-semibold tracking-normal">
+              Base documentaire
+            </h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Pilotez les sources juridiques indexees pour SilkBot.
+            </p>
           </div>
-          <h1 className="font-serif text-4xl font-bold">
-            Base documentaire
-          </h1>
-          <p style={{ color: '#6b6058', marginTop: '0.4rem', fontSize: '0.9rem' }}>
-            Gérez les textes juridiques indexés pour l'assistant.
-          </p>
-        </div>
-
-        {/* Upload zone */}
-        <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          style={{
-            border: `2px dashed ${dragOver ? 'var(--color-primary, #c4956a)' : '#2a2520'}`,
-            borderRadius: '12px', padding: '2rem', textAlign: 'center',
-            cursor: uploading ? 'not-allowed' : 'pointer', marginBottom: '1.5rem',
-            transition: 'all 0.2s', background: dragOver ? 'rgba(196,149,106,0.04)' : 'transparent',
-            opacity: uploading ? 0.6 : 1,
-          }}
-        >
-          <input ref={fileInputRef} type="file" accept=".pdf,.txt,.md"
-            style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); }}
-          />
-          {uploading
-            ? <div style={{ color: 'var(--color-primary, #c4956a)' }}>⏳ Indexation en cours...</div>
-            : <>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📄</div>
-              <div style={{ fontWeight: 500, marginBottom: '0.2rem' }}>
-                Déposer un fichier ou cliquer pour parcourir
-              </div>
-              <div style={{ color: '#4a4540', fontSize: '0.82rem' }}>PDF · TXT · MD</div>
-            </>
-          }
-        </div>
-
-        {/* Stats + Search */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', alignItems: 'center' }}>
-          <div style={{
-            display: 'flex', gap: '1.5rem', padding: '0.75rem 1.25rem',
-            background: '#1a1815', borderRadius: '10px', border: '1px solid #2a2520',
-            flexShrink: 0,
-          }}>
-            <Stat label="Documents" value={documents.length} />
-            <div style={{ width: 1, background: '#2a2520' }} />
-            <Stat label="Segments" value={totalSegments} />
-          </div>
-          <input
-            placeholder="Rechercher un document..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-
-          />
-        </div>
-
-        {/* Table */}
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 100px 130px 180px',
-            padding: '0.65rem 1.25rem', borderBottom: '1px solid #2a2520',
-            color: '#4a4540', fontSize: '0.72rem', letterSpacing: '0.1em', textTransform: 'uppercase',
-          }}>
-            <div>Fichier</div>
-            <div style={{ textAlign: 'center' }}>Segments</div>
-            <div style={{ textAlign: 'center' }}>Ajouté le</div>
-            <div style={{ textAlign: 'right' }}>Actions</div>
-          </div>
-
-          {loading ? (
-            <EmptyState text="Chargement..." />
-          ) : filtered.length === 0 ? (
-            <EmptyState text={search ? 'Aucun résultat' : 'Aucun document indexé'} />
-          ) : filtered.map((doc, i) => (
-            <div
-              key={doc.id}
-              style={{
-                display: 'grid', gridTemplateColumns: '1fr 100px 130px 180px',
-                padding: '0.9rem 1.25rem', alignItems: 'center',
-                borderBottom: i < filtered.length - 1 ? '1px solid #1e1c19' : 'none',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#1e1c19')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => fetchDocuments(true)}
+              disabled={refreshing}
             >
-              {/* Name */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <span style={{ fontSize: '1rem', opacity: 0.75 }}>
-                  {doc.filename.endsWith('.pdf') ? '📕' : '📝'}
-                </span>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '0.88rem' }}>{doc.filename}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#4a4540' }}>{doc.id.slice(0, 10)}...</div>
-                </div>
-              </div>
-
-              {/* Segments badge */}
-              <div style={{ textAlign: 'center' }}>
-                <span style={{
-                  background: 'rgba(196,149,106,0.1)', color: 'var(--color-primary,#c4956a)',
-                  padding: '0.15rem 0.55rem', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 600,
-                }}>
-                  {doc.segmentCount}
-                </span>
-              </div>
-
-              {/* Date */}
-              <div style={{ textAlign: 'center', color: '#4a4540', fontSize: '0.82rem' }}>
-                {formatDate(doc.createdAt)}
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                <ActionBtn
-                  label="Voir"
-                  loading={actionId === doc.id}
-                  onClick={() => handleViewSegments(doc)}
-                  color="#6b9acf"
-                />
-                <ActionBtn
-                  label="Renommer"
-                  onClick={() => handleRenameOpen(doc)}
-                  color="#c4956a"
-                />
-                <ActionBtn
-                  label="Supprimer"
-                  onClick={() => setModal({ type: 'delete', doc })}
-                  color="#cf6b6b"
-                />
-              </div>
-            </div>
-          ))}
+              <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
+              Actualiser
+            </Button>
+            <Button onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Upload className="size-4" />
+              Importer
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <style>{`
-        @keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-        input:focus { border-color: var(--color-primary,#c4956a) !important; }
-      `}</style>
-    </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <Card className="animate-fadeUp [animation-delay:60ms]">
+            <CardHeader>
+              <CardTitle>Documents</CardTitle>
+              <CardDescription>Sources disponibles</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-end justify-between">
+              <span className="text-3xl font-semibold">{documents.length}</span>
+              <FileText className="size-8 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="animate-fadeUp [animation-delay:120ms]">
+            <CardHeader>
+              <CardTitle>Segments</CardTitle>
+              <CardDescription>Passages consultables</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-end justify-between">
+              <span className="text-3xl font-semibold">{totalSegments}</span>
+              <Database className="size-8 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="animate-fadeUp [animation-delay:180ms]">
+            <CardHeader>
+              <CardTitle>Dernier import</CardTitle>
+              <CardDescription>
+                {latestDocument ? formatDate(latestDocument.createdAt) : "Aucun document"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="truncate text-sm font-medium">
+                {latestDocument?.filename || "En attente d'une source"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="animate-fadeUp [animation-delay:240ms]">
+            <CardHeader>
+              <CardTitle>Comptes</CardTitle>
+              <CardDescription>Utilisateurs inscrits</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-end justify-between">
+              <span className="text-3xl font-semibold">{accounts.length}</span>
+              <Users className="size-8 text-primary" />
+            </CardContent>
+          </Card>
+          <Card className="animate-fadeUp [animation-delay:300ms]">
+            <CardHeader>
+              <CardTitle>Emails verifies</CardTitle>
+              <CardDescription>Comptes confirmes</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-end justify-between">
+              <span className="text-3xl font-semibold">{verifiedAccounts}</span>
+              <ShieldCheck className="size-8 text-primary" />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <Card className="animate-fadeUp">
+              <CardHeader>
+                <CardTitle>Nouvelle source</CardTitle>
+                <CardDescription>
+                  PDF, TXT ou Markdown. L&apos;indexation peut prendre quelques secondes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragOver(false);
+                    const file = event.dataTransfer.files[0];
+                    if (file) uploadFile(file);
+                  }}
+                  className={cn(
+                    "flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/25 p-6 text-center transition-all hover:bg-muted/45",
+                    dragOver && "border-primary bg-primary/5 ring-3 ring-primary/15",
+                    uploading && "cursor-wait opacity-70",
+                  )}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) uploadFile(file);
+                    }}
+                  />
+                  <span className="flex size-11 items-center justify-center rounded-lg bg-background ring-1 ring-border">
+                    <Upload className="size-5 text-primary" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">
+                      Deposez un fichier ici ou cliquez pour parcourir
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Formats acceptes: PDF, TXT, MD
+                    </p>
+                  </div>
+                  {uploading && (
+                    <div className="mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
+                </button>
+              </CardContent>
+            </Card>
+
+            <Card className="animate-fadeUp">
+              <CardHeader>
+                <CardTitle>Documents indexes</CardTitle>
+                <CardDescription>
+                  Recherchez, inspectez ou supprimez une source.
+                </CardDescription>
+                <CardAction className="hidden sm:block">
+                  <span className="text-xs text-muted-foreground">
+                    {filteredDocuments.length} resultat(s)
+                  </span>
+                </CardAction>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Rechercher par nom ou identifiant"
+                      className="pl-8"
+                    />
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="justify-start">
+                        <Filter className="size-4" />
+                        {filter === "all" ? "Tous" : filter === "pdf" ? "PDF" : "Texte"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36">
+                      <DropdownMenuLabel>Filtrer</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setFilter("all")}>
+                        Tous
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilter("pdf")}>
+                        PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFilter("text")}>
+                        Texte
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border">
+                  <div className="hidden grid-cols-[1fr_100px_120px_44px] border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
+                    <span>Source</span>
+                    <span className="text-center">Segments</span>
+                    <span className="text-center">Date</span>
+                    <span />
+                  </div>
+
+                  {loading ? (
+                    <div className="space-y-2 p-3">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <Skeleton key={index} className="h-12 w-full" />
+                      ))}
+                    </div>
+                  ) : filteredDocuments.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
+                      <FileText className="size-8 text-muted-foreground" />
+                      <p className="text-sm font-medium">Aucun document trouve</p>
+                      <p className="text-xs text-muted-foreground">
+                        Modifiez la recherche ou importez une nouvelle source.
+                      </p>
+                    </div>
+                  ) : (
+                    filteredDocuments.map((document, index) => (
+                      <div
+                        key={document.id}
+                        className={cn(
+                          "grid gap-3 px-3 py-3 transition-colors hover:bg-muted/30 md:grid-cols-[1fr_100px_120px_44px] md:items-center",
+                          index !== filteredDocuments.length - 1 && "border-b",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => loadSegments(document)}
+                          className="flex min-w-0 items-center gap-3 text-left"
+                        >
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                            <FileText className="size-4 text-primary" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium">
+                              {document.filename}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {document.id}
+                            </span>
+                          </span>
+                        </button>
+
+                        <span className="w-fit rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary md:mx-auto">
+                          {document.segmentCount}
+                        </span>
+                        <span className="text-xs text-muted-foreground md:text-center">
+                          {formatDate(document.createdAt)}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" className="justify-self-end">
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onClick={() => loadSegments(document)}>
+                              <Eye className="size-4" />
+                              Voir segments
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => copyId(document.id)}>
+                              <Copy className="size-4" />
+                              Copier ID
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => deleteDocument(document)}
+                              disabled={deletingId === document.id}
+                            >
+                              <Trash2 className="size-4" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="animate-fadeUp lg:sticky lg:top-6 lg:self-start">
+            <CardHeader>
+              <CardTitle>Apercu des segments</CardTitle>
+              <CardDescription>
+                Controle rapide du contenu indexe.
+              </CardDescription>
+              {selectedDocument && (
+                <CardAction>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      setSelectedDocument(null);
+                      setSegments([]);
+                    }}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </CardAction>
+              )}
+            </CardHeader>
+            <CardContent>
+              {!selectedDocument ? (
+                <div className="flex min-h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-center">
+                  <Eye className="size-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">Selectionnez un document</p>
+                  <p className="max-w-56 text-xs text-muted-foreground">
+                    Les premiers segments apparaissent ici pour verification.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg bg-muted/40 p-3">
+                    <p className="truncate text-sm font-medium">
+                      {selectedDocument.filename}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedDocument.segmentCount} segments
+                    </p>
+                  </div>
+
+                  {segmentsLoading ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <Skeleton key={index} className="h-16 w-full" />
+                      ))}
+                    </div>
+                  ) : segments.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Aucun segment disponible.
+                    </div>
+                  ) : (
+                    <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+                      {segments.slice(0, 20).map((segment, index) => (
+                        <div
+                          key={`${selectedDocument.id}-${index}`}
+                          className="rounded-lg border bg-background p-3 text-sm"
+                        >
+                          <div className="mb-1 text-xs font-medium text-muted-foreground">
+                            Segment {index + 1}
+                          </div>
+                          <p className="line-clamp-5 text-muted-foreground">
+                            {segment}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="animate-fadeUp">
+          <CardHeader>
+            <CardTitle>Gestion des comptes</CardTitle>
+            <CardDescription>
+              Consultez les utilisateurs, leurs sessions et leurs conversations.
+            </CardDescription>
+            <CardAction className="hidden sm:block">
+              <span className="text-xs text-muted-foreground">
+                {filteredAccounts.length} compte(s)
+              </span>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-md">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={accountQuery}
+                  onChange={(event) => setAccountQuery(event.target.value)}
+                  placeholder="Rechercher un nom, email ou ID"
+                  className="pl-8"
+                />
+              </div>
+              <Button variant="outline" onClick={() => void fetchAccounts()}>
+                <RefreshCw className="size-4" />
+                Recharger comptes
+              </Button>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border">
+              <div className="hidden grid-cols-[1fr_110px_90px_110px_44px] border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
+                <span>Utilisateur</span>
+                <span className="text-center">Statut</span>
+                <span className="text-center">Chats</span>
+                <span className="text-center">Inscrit</span>
+                <span />
+              </div>
+
+              {loading ? (
+                <div className="space-y-2 p-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <Skeleton key={index} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : filteredAccounts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
+                  <Users className="size-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">Aucun compte trouve</p>
+                  <p className="text-xs text-muted-foreground">
+                    Essayez une autre recherche.
+                  </p>
+                </div>
+              ) : (
+                filteredAccounts.map((account, index) => (
+                  <div
+                    key={account.id}
+                    className={cn(
+                      "grid gap-3 px-3 py-3 transition-colors hover:bg-muted/30 lg:grid-cols-[1fr_110px_90px_110px_44px] lg:items-center",
+                      index !== filteredAccounts.length - 1 && "border-b",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                        {account.name
+                          .split(" ")
+                          .map((part) => part[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2) || "?"}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">
+                            {account.name}
+                          </span>
+                          {account.isCurrentUser && (
+                            <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              Vous
+                            </span>
+                          )}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {account.email}
+                        </span>
+                        <span className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                          <span>{account.sessionCount} session(s)</span>
+                          <span>{account.accountCount} liaison(s)</span>
+                        </span>
+                      </span>
+                    </div>
+
+                    <span
+                      className={cn(
+                        "w-fit rounded-md px-2 py-1 text-xs font-medium lg:mx-auto",
+                        account.emailVerified
+                          ? "bg-primary/10 text-primary"
+                          : "bg-destructive/10 text-destructive",
+                      )}
+                    >
+                      {account.emailVerified ? "Verifie" : "Non verifie"}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground lg:justify-center">
+                      <Database className="size-3" />
+                      {account.chatCount}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground lg:justify-center">
+                      <CalendarDays className="size-3" />
+                      {formatDate(account.createdAt)}
+                    </span>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" className="justify-self-end">
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>Compte</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => copyId(account.id)}>
+                          <Copy className="size-4" />
+                          Copier ID
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => toggleAccountVerification(account)}
+                          disabled={updatingAccountId === account.id}
+                        >
+                          {account.emailVerified ? (
+                            <UserX className="size-4" />
+                          ) : (
+                            <UserCheck className="size-4" />
+                          )}
+                          {account.emailVerified ? "Marquer non verifie" : "Verifier email"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={
+                            account.isCurrentUser || deletingAccountId === account.id
+                          }
+                          onClick={() => deleteAccount(account)}
+                        >
+                          <Trash2 className="size-4" />
+                          Supprimer compte
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Conseil: gardez les documents courts et bien structures pour ameliorer la qualite
+          des reponses. Taille du dernier fichier selectionne affichee pendant l&apos;import:{" "}
+          {selectedFileSize}
+        </div>
+      </section>
+    </main>
   );
-}
-
-// ── Small helpers ──────────────────────────────────────────
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div style={{ color: '#4a4540', fontSize: '0.72rem' }}>{label}</div>
-      <div style={{ color: 'var(--color-primary,#c4956a)', fontWeight: 700, fontSize: '1.2rem', lineHeight: 1.2 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div style={{ padding: '3rem', textAlign: 'center', color: '#4a4540' }}>{text}</div>
-  );
-}
-
-function ActionBtn({ label, onClick, color, loading }: {
-  label: string; onClick: () => void; color: string; loading?: boolean;
-}) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        background: hover ? `${color}22` : 'transparent',
-        border: `1px solid ${color}55`,
-        color, padding: '0.3rem 0.6rem', borderRadius: '6px',
-        cursor: loading ? 'not-allowed' : 'pointer',
-        fontSize: '0.78rem', transition: 'all 0.15s',
-        opacity: loading ? 0.5 : 1,
-      }}
-    >
-      {loading ? '...' : label}
-    </button>
-  );
-}
-
-function btnStyle(variant: 'primary' | 'ghost' | 'danger'): React.CSSProperties {
-  const base: React.CSSProperties = {
-    padding: '0.5rem 1.1rem', borderRadius: '8px',
-    fontSize: '0.88rem', cursor: 'pointer', border: '1px solid',
-    transition: 'all 0.15s',
-  };
-  if (variant === 'primary') return { ...base, background: 'var(--color-primary,#c4956a)', color: '#0f0e0c', borderColor: 'transparent', fontWeight: 600 };
-  if (variant === 'danger') return { ...base, background: '#3a1a1a', color: '#cf6b6b', borderColor: '#6a2d2d' };
-  return { ...base, background: 'transparent', color: '#8a7f72', borderColor: '#2a2520' };
 }
