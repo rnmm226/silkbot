@@ -11,7 +11,21 @@ const nextConfig = {
     "@scribe.js/canvas",
     "@scribe.js/canvas-win32-x64-msvc",
   ],
+
+  
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
 };
+
 
 
 export default nextConfig;

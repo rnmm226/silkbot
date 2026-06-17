@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Button } from "@/components/ui/button"
+import * as React from "react";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Settings2Icon,
   FileTextIcon,
@@ -22,34 +22,50 @@ import {
   ArrowDownIcon,
   StarIcon,
   MoreHorizontalIcon,
-} from "lucide-react"
+  ShieldCheckIcon,
+  UsersIcon,
+  DatabaseIcon,
+} from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const data = [
   [
-    { label: "Personnaliser",   icon: Settings2Icon },
+    { label: "Personnaliser", icon: Settings2Icon },
     { label: "Convertir en doc", icon: FileTextIcon },
   ],
   [
-    { label: "Copier le lien",  icon: LinkIcon },
-    { label: "Dupliquer",       icon: CopyIcon },
-    { label: "Déplacer vers",   icon: CornerUpRightIcon },
-    { label: "Supprimer",       icon: Trash2Icon },
+    { label: "Copier le lien", icon: LinkIcon },
+    { label: "Dupliquer", icon: CopyIcon },
+    { label: "Déplacer vers", icon: CornerUpRightIcon },
+    { label: "Supprimer", icon: Trash2Icon },
   ],
   [
-    { label: "Annuler",         icon: CornerUpLeftIcon },
-    { label: "Historique",      icon: GalleryVerticalEndIcon },
-    { label: "Corbeille",       icon: TrashIcon },
-    { label: "Notifications",   icon: BellIcon },
+    { label: "Annuler", icon: CornerUpLeftIcon },
+    { label: "Historique", icon: GalleryVerticalEndIcon },
+    { label: "Corbeille", icon: TrashIcon },
+    { label: "Notifications", icon: BellIcon },
   ],
   [
-    { label: "Importer",        icon: ArrowUpIcon },
-    { label: "Exporter",        icon: ArrowDownIcon },
+    { label: "Importer", icon: ArrowUpIcon },
+    { label: "Exporter", icon: ArrowDownIcon },
   ],
-]
+];
+
+// ✅ Actions admin
+const adminActions = [
+  { label: "Administration", icon: ShieldCheckIcon, href: "/admin" },
+  { label: "Gestion des utilisateurs", icon: UsersIcon, href: "/admin/users" },
+  { label: "Base documentaire", icon: DatabaseIcon, href: "/admin/documents" },
+];
 
 export function NavActions() {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [starred, setStarred] = React.useState(false)
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [starred, setStarred] = React.useState(false);
+  const { data: session } = useSession();
+  const router = useRouter();
+  
+  const isAdmin = session?.user?.role === "admin";
 
   return (
     <div className="flex items-center gap-1">
@@ -83,6 +99,30 @@ export function NavActions() {
           align="end"
           sideOffset={6}
         >
+          {isAdmin && (
+            <>
+              <div className="space-y-0.5">
+                {adminActions.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push(item.href);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-light transition-colors text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="my-1 h-px bg-border/40 mx-1" />
+            </>
+          )}
+
           {data.map((group, gi) => (
             <div key={gi}>
               {gi > 0 && (
@@ -90,22 +130,21 @@ export function NavActions() {
               )}
               <div className="space-y-0.5">
                 {group.map((item) => {
-                  const Icon = item.icon
-                  const isDanger = item.label === "Supprimer" || item.label === "Corbeille"
+                  const Icon = item.icon;
+                  const isDanger = item.label === "Supprimer" || item.label === "Corbeille";
                   return (
                     <button
                       key={item.label}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left
-                        text-xs font-light transition-colors
-                        ${isDanger
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-light transition-colors ${
+                        isDanger
                           ? "text-destructive/70 hover:text-destructive hover:bg-destructive/8"
                           : "text-popover-foreground/70 hover:text-popover-foreground hover:bg-muted/60"
-                        }`}
+                      }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
                       {item.label}
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -113,5 +152,5 @@ export function NavActions() {
         </PopoverContent>
       </Popover>
     </div>
-  )
+  );
 }

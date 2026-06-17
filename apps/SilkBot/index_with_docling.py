@@ -4,174 +4,135 @@ import json
 import psycopg
 import time
 import threading
-import fitz  # PyMuPDF (fallback)
+import fitz  # PyMuPDF
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
-import signal
 import gc
+import tempfile
+import shutil
 from contextlib import contextmanager
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
 # ─────────────────────────────────────────────
-# TIMEOUT HANDLER — compatible Windows (pas de SIGALRM)
+# TIMEOUT (cross-platform)
 # ─────────────────────────────────────────────
 class TimeoutError(Exception):
     pass
 
 
-@contextmanager
-def time_limit(seconds):
-    """Timeout cross-platform : lance un thread watchdog."""
-    if seconds <= 0:
-        yield
-        return
-    _done = threading.Event()
-    def _watchdog():
-        _done.wait(timeout=seconds)
-    t = threading.Thread(target=_watchdog, daemon=True)
-    t.start()
-    try:
-        yield
-    finally:
-        _done.set()
-        t.join(timeout=1)
-
-
 def _run_with_timeout(fn, seconds, *args, **kwargs):
-    """Exécute fn(*args, **kwargs) dans un thread séparé avec timeout strict.
-    Lève TimeoutError si le délai est dépassé.
-    """
-    result = [None]
-    exc = [None]
+    result, exc = [None], [None]
     def worker():
-        try:
-            result[0] = fn(*args, **kwargs)
-        except Exception as e:
-            exc[0] = e
+        try: result[0] = fn(*args, **kwargs)
+        except Exception as e: exc[0] = e
     t = threading.Thread(target=worker, daemon=True)
-    t.start()
-    t.join(timeout=seconds)
-    if t.is_alive():
-        raise TimeoutError(f"Timeout apres {seconds}s")
-    if exc[0] is not None:
-        raise exc[0]
+    t.start(); t.join(timeout=seconds)
+    if t.is_alive(): raise TimeoutError(f"Timeout apres {seconds}s")
+    if exc[0]: raise exc[0]
     return result[0]
 
 
 # ─────────────────────────────────────────────
-# TESSERACT CONFIGURATION
+# TESSERACT / POPPLER
 # ─────────────────────────────────────────────
 TESSERACT_PATH = r"C:\Users\rnmdr\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+POPPLER_PATH   = r"C:\Users\rnmdr\Downloads\Release-26.02.0-0\poppler-26.02.0\Library\bin"
 
 if os.path.exists(TESSERACT_PATH):
     os.environ['PATH'] = os.path.dirname(TESSERACT_PATH) + os.pathsep + os.environ['PATH']
-    print(f"✅ Tesseract found: {TESSERACT_PATH}")
+    print(f"✅ Tesseract: {TESSERACT_PATH}")
 else:
-    print(f"⚠️  Tesseract not found at {TESSERACT_PATH}")
+    print(f"⚠️  Tesseract introuvable: {TESSERACT_PATH}")
 
 import pytesseract
-
 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
-
-# ─────────────────────────────────────────────
-# POPPLER CONFIGURATION
-# ─────────────────────────────────────────────
-POPPLER_PATH = r"C:\Users\rnmdr\Downloads\Release-26.02.0-0\poppler-26.02.0\Library\bin"
 
 if os.path.exists(POPPLER_PATH):
     os.environ['PATH'] = POPPLER_PATH + os.pathsep + os.environ['PATH']
-    print(f"✅ Poppler configured: {POPPLER_PATH}")
+    print(f"✅ Poppler: {POPPLER_PATH}")
 else:
-    print(f"❌ Poppler path does not exist: {POPPLER_PATH}")
+    print(f"❌ Poppler introuvable: {POPPLER_PATH}")
+
 
 # ─────────────────────────────────────────────
-# CONFIGURATION - OPTIMISÉE POUR GROS VOLUMES
+# CONFIGURATION
 # ─────────────────────────────────────────────
 DB_URL = "postgresql://postgres:secret123@localhost:5432/monapp"
-FOLDER = "downloaded_pdfs"
-PARALLEL_WORKERS = 1  # ⚠️ RÉDUIT À 1 pour éviter les crashes mémoire
-CHUNK_SIZE = 150
-EMBEDDING_BATCH_SIZE = 32  # Réduit pour moins de mémoire
-DOCLING_MAX_SIZE_MB = 3.0  # Réduit: les gros PDFs vont directement à fitz
-DOCLING_TIMEOUT = 30  # Réduit à 30s
-PDF_EXTRACTION_TIMEOUT = 60  # Timeout global pour l'extraction
 
-# 🔒 CONFIGURATION DE SÉCURITÉ
-SAFE_MODE = True
-ALLOW_DELETION = False
-SKIP_EXISTING = True
-BATCH_COMMIT_SIZE = 10  # Commit après N documents
-PROGRESS_FILE = "indexation_progress.json"  # Fichier de reprise
+# 🔹 DEUX DOSSIERS SOURCES
+FOLDERS = {
+    "jibaya": "downloaded_pdfs",
+    "jort":   "downloaded_jort_pdfs",
+}
+
+PARALLEL_WORKERS        = 1
+CHUNK_SIZE              = 150
+EMBEDDING_BATCH_SIZE    = 32
+DOCLING_MAX_SIZE_MB     = 3.0
+DOCLING_TIMEOUT         = 30
+PDF_EXTRACTION_TIMEOUT  = 60
+
+SKIP_EXISTING  = True
+PROGRESS_FILE  = "indexation_progress.json"
+
 
 # ─────────────────────────────────────────────
-# FIX WINDOWS UNICODE FILENAME ISSUES
+# WINDOWS UNICODE FIX
 # ─────────────────────────────────────────────
-import tempfile
-import shutil
-
-
 def get_safe_pdf_path(filepath):
     try:
         filepath.encode('ascii')
-        with open(filepath, 'rb') as f:
-            pass
+        with open(filepath, 'rb'): pass
         return filepath, False
     except (UnicodeEncodeError, UnicodeDecodeError, OSError, FileNotFoundError):
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf', prefix='pdf_')
-        os.close(temp_fd)
-        shutil.copy2(filepath, temp_path)
-        return temp_path, True
+        fd, tmp = tempfile.mkstemp(suffix='.pdf', prefix='pdf_')
+        os.close(fd)
+        shutil.copy2(filepath, tmp)
+        return tmp, True
 
 
-# Modèle partagé entre les threads
+# Modèle d'embedding partagé
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 db_lock = threading.Lock()
 
+
 # ─────────────────────────────────────────────
-# GESTION DE LA REPRISE (PROGRESS FILE)
+# PROGRESS FILE
 # ─────────────────────────────────────────────
 progress_lock = threading.Lock()
 
 def load_progress():
-    """Charge les fichiers déjà traités (succès ET échecs) depuis le fichier de reprise."""
-    if not os.path.exists(PROGRESS_FILE):
-        return set()
+    if not os.path.exists(PROGRESS_FILE): return set()
     try:
         with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return set(data.get('processed', []))
+            return set(json.load(f).get('processed', []))
     except Exception:
         return set()
 
-def save_progress(filename, status):
-    """Ajoute un fichier traité dans le fichier de reprise."""
+def save_progress(key, status):
     with progress_lock:
-        processed = load_progress()
-        processed.add(filename)
+        done = load_progress(); done.add(key)
         try:
             with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
-                json.dump({'processed': list(processed)}, f, ensure_ascii=False)
+                json.dump({'processed': list(done)}, f, ensure_ascii=False)
         except Exception:
             pass
 
+
 # ─────────────────────────────────────────────
-# DOCLING — une instance par thread via thread-local
+# DOCLING (thread-local)
 # ─────────────────────────────────────────────
 _thread_local = threading.local()
-
 
 def get_converter():
     if not hasattr(_thread_local, "converter"):
         opts = PdfPipelineOptions()
-        opts.do_ocr = False
-        opts.do_table_structure = False
-        # Désactiver les fonctionnalités lourdes
         opts.do_ocr = False
         opts.do_table_structure = False
         _thread_local.converter = DocumentConverter(
@@ -181,123 +142,160 @@ def get_converter():
 
 
 # ─────────────────────────────────────────────
-# UTILITAIRES TEXTE
+# CHUNKING
 # ─────────────────────────────────────────────
 def chunk_text_by_words(text, chunk_size=CHUNK_SIZE):
     words = text.split()
-    if not words:
-        return []
+    if not words: return []
     return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+
+
+# ─────────────────────────────────────────────
+# 🔹 DÉTECTION SOURCE + MÉTADONNÉES JURIDIQUES TUNISIENNES
+# ─────────────────────────────────────────────
+def detect_source(filename, relative_path="", default="autre"):
+    s = (relative_path + "/" + filename).lower()
+    if 'jibaya' in s or 'note commune' in s or 'note-commune' in s or 'doctrine' in s:
+        return 'jibaya'
+    if 'jort' in s or 'journal officiel' in s or 'journal-officiel' in s:
+        return 'jort'
+    return default
+
+
+MONTHS_FR = {
+    'janvier':1,'février':2,'fevrier':2,'mars':3,'avril':4,'mai':5,'juin':6,
+    'juillet':7,'août':8,'aout':8,'septembre':9,'octobre':10,'novembre':11,
+    'décembre':12,'decembre':12,
+}
+
+def extract_legal_metadata(text, filename, source):
+    meta = {
+        'source': source, 'jort_number': None, 'jort_date': None,
+        'note_commune_number': None, 'note_commune_year': None,
+        'law_number': None, 'decree_number': None, 'arrete': False, 'year': None,
+    }
+    head = text[:5000]
+
+    m = re.search(r"note\s+commune\s*n[°ºo]?\s*(\d+)\s*[/\-]?\s*(20\d{2})?", head, re.I)
+    if m:
+        meta['note_commune_number'] = m.group(1)
+        if m.group(2): meta['note_commune_year'] = int(m.group(2))
+
+    m = re.search(r"journal\s+officiel.{0,40}?n[°ºo]?\s*(\d+)", head, re.I)
+    if m: meta['jort_number'] = m.group(1)
+
+    m = re.search(r"(\d{1,2})\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(20\d{2})", head, re.I)
+    if m:
+        d, mo, y = int(m.group(1)), MONTHS_FR[m.group(2).lower()], int(m.group(3))
+        meta['jort_date'] = f"{y:04d}-{mo:02d}-{d:02d}"
+        meta['year'] = y
+
+    m = re.search(r"loi\s*n[°ºo]?\s*(20\d{2}\s*[-/]\s*\d+)", head, re.I)
+    if m: meta['law_number'] = re.sub(r"\s+", "", m.group(1))
+    m = re.search(r"d[ée]cret\s*(?:-loi\s*)?n[°ºo]?\s*(20\d{2}\s*[-/]\s*\d+)", head, re.I)
+    if m: meta['decree_number'] = re.sub(r"\s+", "", m.group(1))
+    if re.search(r"\barr[êe]t[ée]\s+(du|n[°ºo])", head, re.I):
+        meta['arrete'] = True
+
+    if not meta['year']:
+        m = re.search(r"(20\d{2})", filename)
+        if m: meta['year'] = int(m.group(1))
+
+    return meta
 
 
 def extract_article_number(text):
     patterns = [
-        r'Art\.?\s*(\d+)[^\d]',
-        r'Article\s*(\d+)[^\d]',
-        r'[\(\[][Aa]rt\.?\s*(\d+)[\)\]]',
+        r'Art(?:icle)?\.?\s*(?:premier|1er|1ᵉʳ)',
+        r'Art(?:icle)?\.?\s*(\d+)\s*(?:bis|ter|quater)?',
+        r'[\(\[]\s*Art\.?\s*(\d+)\s*[\)\]]',
+        r'الفصل\s+(\d+)',
     ]
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return match.group(1)
+    for p in patterns:
+        m = re.search(p, text, re.I)
+        if m:
+            return m.group(1) if m.groups() and m.group(1) else '1'
     return None
 
 
-def generate_tags(content, filename):
-    tags = []
-    year_match = re.search(r'(20\d{2})', filename)
-    if year_match:
-        tags.append(f"year_{year_match.group(1)}")
-    file_lower = filename.lower()
-    if 'code' in file_lower:
-        tags.append('code')
-    if 'note commune' in file_lower or 'note-commune' in file_lower:
-        tags.append('note_commune')
-    if 'loi de finances' in file_lower or 'loi-des-finances' in file_lower:
-        tags.append('loi_finances')
-    if 'convention' in file_lower:
-        tags.append('convention')
-    if 'recueil' in file_lower:
-        tags.append('recueil')
-    content_lower = content.lower()[:2000]
-    keywords = {
-        'fiscal': ['fiscal', 'impôt', 'taxe', 'tva', 'irpp', 'is'],
-        'investissement': ['investissement', 'incitation', 'prime', 'avantage'],
-        'procedure': ['procédure', 'déclaration', 'recouvrement', 'contrôle'],
-        'social': ['social', 'solidarité', 'cotisation'],
-    }
-    for category, cat_keywords in keywords.items():
-        if any(kw in content_lower for kw in cat_keywords):
-            tags.append(category)
-    return list(set(tags))
+KEYWORD_TAGS = {
+    'tva': ['tva', 'taxe sur la valeur ajoutée', 'الأداء على القيمة المضافة'],
+    'irpp': ['irpp', 'impôt sur le revenu', 'الضريبة على الدخل'],
+    'is': ['impôt sur les sociétés', 'الضريبة على الشركات'],
+    'droits_enregistrement': ["droits d'enregistrement", 'timbre'],
+    'douane': ['douane', 'douanier', 'tarif douanier'],
+    'investissement': ['investissement', 'incitation', 'prime', 'avantage fiscal'],
+    'procedure_fiscale': ['contrôle fiscal', 'vérification', "taxation d'office", 'recouvrement'],
+    'social': ['cnss', 'cotisation sociale', 'sécurité sociale'],
+    'change': ['change', 'devises', 'bct', 'banque centrale'],
+    'foncier': ['foncier', 'immobilier', 'tnb', 'taxe sur les immeubles'],
+    'penal_fiscal': ['sanction', 'pénalité', 'infraction fiscale'],
+}
+
+def generate_tags(content, filename, meta=None):
+    tags = set()
+    meta = meta or {}
+
+    if meta.get('source'): tags.add(f"source_{meta['source']}")
+    if meta.get('note_commune_number'): tags.add('note_commune')
+    if meta.get('jort_number'): tags.add('jort')
+    if meta.get('law_number'): tags.add('loi')
+    if meta.get('decree_number'): tags.add('decret')
+    if meta.get('arrete'): tags.add('arrete')
+    if meta.get('year'): tags.add(f"year_{meta['year']}")
+
+    fl = filename.lower()
+    if 'code' in fl: tags.add('code')
+    if 'loi de finances' in fl or 'loi-des-finances' in fl: tags.add('loi_finances')
+    if 'convention' in fl: tags.add('convention')
+    if 'circulaire' in fl: tags.add('circulaire')
+    if 'recueil' in fl: tags.add('recueil')
+
+    cl = content.lower()[:3000]
+    for tag, kws in KEYWORD_TAGS.items():
+        if any(kw in cl for kw in kws):
+            tags.add(tag)
+
+    return list(tags)
 
 
 # ─────────────────────────────────────────────
-# EXTRACTION PDF - VERSION ROBUSTE
+# EXTRACTION PDF
 # ─────────────────────────────────────────────
 def extract_with_docling(filepath, timeout=DOCLING_TIMEOUT):
-    """Extraction avec Docling et timeout"""
     result = {'text': None, 'num_pages': 0, 'error': None}
-
     def worker():
         try:
-            converter = get_converter()
-            doc_result = converter.convert(filepath)
-            result['text'] = doc_result.document.export_to_markdown()
-            # Estimer le nombre de pages
-            if hasattr(doc_result.document, 'pages'):
-                result['num_pages'] = len(doc_result.document.pages)
+            r = get_converter().convert(filepath)
+            result['text'] = r.document.export_to_markdown()
+            if hasattr(r.document, 'pages'):
+                result['num_pages'] = len(r.document.pages)
             else:
-                # Fallback: essayer d'ouvrir avec fitz pour le nombre de pages
                 try:
-                    doc = fitz.open(filepath)
-                    result['num_pages'] = len(doc)
-                    doc.close()
-                except:
-                    result['num_pages'] = 1
+                    d = fitz.open(filepath); result['num_pages'] = len(d); d.close()
+                except: result['num_pages'] = 1
         except Exception as e:
             result['error'] = str(e)
-
-    t = threading.Thread(target=worker)
-    t.start()
-    t.join(timeout=timeout)
-
-    if t.is_alive():
-        return None, 0, f"Timeout après {timeout}s"
-    if result['error']:
-        return None, 0, result['error']
+    t = threading.Thread(target=worker); t.start(); t.join(timeout=timeout)
+    if t.is_alive(): return None, 0, f"Timeout {timeout}s"
+    if result['error']: return None, 0, result['error']
     if not result['text'] or len(result['text'].strip()) < 50:
-        return None, 0, "Texte trop court ou vide"
+        return None, 0, "Texte trop court"
     return result['text'], result['num_pages'], None
 
 
 def extract_with_fitz(filepath):
-    """Extraction avec PyMuPDF (fitz)"""
     try:
         doc = fitz.open(filepath)
-        total_pages = len(doc)
         pages_text = []
-
-        # Limiter le nombre de pages pour les PDFs géants
-        max_pages = min(total_pages, 500)
-
-        for page_num in range(max_pages):
+        for i in range(min(len(doc), 500)):
             try:
-                page = doc[page_num]
-                text = page.get_text().strip()
-                if text:
-                    pages_text.append(text)
-            except Exception as e:
-                # Ignorer les erreurs de page individuelle
-                continue
-
+                t = doc[i].get_text().strip()
+                if t: pages_text.append(t)
+            except: continue
         doc.close()
-
-        if not pages_text:
-            return None, 0, "Aucun texte extrait avec fitz"
-
-        full_text = "\n".join(pages_text)
-        return full_text, len(pages_text), None
+        if not pages_text: return None, 0, "Aucun texte fitz"
+        return "\n".join(pages_text), len(pages_text), None
     except Exception as e:
         return None, 0, f"Erreur fitz: {e}"
 
@@ -305,178 +303,106 @@ def extract_with_fitz(filepath):
 def is_valid_pdf(filepath):
     try:
         with open(filepath, 'rb') as f:
-            header = f.read(5)
-            if header != b'%PDF-':
-                return False
-            # Vérifier rapidement EOF
+            if f.read(5) != b'%PDF-': return False
             try:
-                f.seek(-20, 2)
-                tail = f.read()
-                return b'%%EOF' in tail
-            except:
-                # Si le fichier est trop petit, le considérer comme valide
-                return True
-    except:
-        return False
+                f.seek(-20, 2); return b'%%EOF' in f.read()
+            except: return True
+    except: return False
 
 
 def extract_with_ocr(filepath):
-    """Extraction OCR avec Tesseract"""
     try:
         from pdf2image import convert_from_path
-
-        # Limiter le nombre de pages OCR
-        max_ocr_pages = 50
-        images = convert_from_path(filepath, dpi=150, poppler_path=POPPLER_PATH, first_page=1, last_page=max_ocr_pages)
-
-        pages_text = []
-        for img in images:
+        imgs = convert_from_path(filepath, dpi=150, poppler_path=POPPLER_PATH,
+                                 first_page=1, last_page=50)
+        pages = []
+        for img in imgs:
             try:
-                text = pytesseract.image_to_string(img, lang='fra')
-                if text.strip():
-                    pages_text.append(text.strip())
-                else:
-                    # Essayer en arabe
-                    text = pytesseract.image_to_string(img, lang='ara')
-                    if text.strip():
-                        pages_text.append(text.strip())
-            except Exception as e:
-                continue
-
-        if not pages_text:
-            return None, 0, "OCR: aucun texte"
-        return "\n".join(pages_text), len(pages_text), None
+                # Essai bilingue fra+ara directement
+                t = pytesseract.image_to_string(img, lang='fra+ara').strip()
+                if t: pages.append(t)
+            except: continue
+        if not pages: return None, 0, "OCR vide"
+        return "\n".join(pages), len(pages), None
     except Exception as e:
         return None, 0, f"Erreur OCR: {e}"
 
 
 def extract_from_pdf(filepath):
-    """Extraction robuste avec fallback"""
     safe_path, is_temp = get_safe_pdf_path(filepath)
-
-    if not os.path.exists(safe_path):
-        return None, 0, "Fichier inexistant"
-
-    if not is_valid_pdf(safe_path):
-        return None, 0, "PDF invalide"
-
+    if not os.path.exists(safe_path): return None, 0, "Fichier inexistant"
+    if not is_valid_pdf(safe_path):   return None, 0, "PDF invalide"
     try:
         size_mb = os.path.getsize(safe_path) / (1024 * 1024)
-
-        # Stratégie: d'abord fitz pour les gros fichiers, docling pour les petits
         if size_mb > DOCLING_MAX_SIZE_MB:
-            text, num_pages, error = extract_with_fitz(safe_path)
-            if text and len(text.strip()) > 100:
-                return text, num_pages, None
+            t, n, e = extract_with_fitz(safe_path)
+            if t and len(t.strip()) > 100: return t, n, None
+            t, n, e = extract_with_ocr(safe_path)
+            if t and len(t.strip()) > 100: return t, n, None
+            return None, 0, e or "Extraction impossible"
 
-            # Si fitz échoue, essayer OCR
-            text, num_pages, error = extract_with_ocr(safe_path)
-            if text and len(text.strip()) > 100:
-                return text, num_pages, None
-            return None, 0, error or "Extraction impossible"
-
-        # Petit fichier: d'abord Docling
-        text, num_pages, error = extract_with_docling(safe_path)
-        if text and len(text.strip()) > 100:
-            return text, num_pages, None
-
-        # Docling échoue -> fitz
-        text, num_pages, error = extract_with_fitz(safe_path)
-        if text and len(text.strip()) > 100:
-            return text, num_pages, None
-
-        # Fitz échoue -> OCR
-        text, num_pages, error = extract_with_ocr(safe_path)
-        if text and len(text.strip()) > 100:
-            return text, num_pages, None
-
-        return None, 0, error or "Extraction impossible"
-
+        t, n, e = extract_with_docling(safe_path)
+        if t and len(t.strip()) > 100: return t, n, None
+        t, n, e = extract_with_fitz(safe_path)
+        if t and len(t.strip()) > 100: return t, n, None
+        t, n, e = extract_with_ocr(safe_path)
+        if t and len(t.strip()) > 100: return t, n, None
+        return None, 0, e or "Extraction impossible"
     except Exception as e:
         return None, 0, f"Erreur extraction: {e}"
     finally:
-        if is_temp and safe_path and os.path.exists(safe_path):
-            try:
-                os.unlink(safe_path)
-            except:
-                pass
-        # Forcer le garbage collection
+        if is_temp and os.path.exists(safe_path):
+            try: os.unlink(safe_path)
+            except: pass
         gc.collect()
 
 
 # ─────────────────────────────────────────────
-# INSERTION EN BASE - AVEC BATCH
+# INSERTION DB — clé unique = source/relative_path
 # ─────────────────────────────────────────────
 def insert_document(conn, result):
-    """Insère un nouveau document seulement s'il n'existe pas"""
     cur = conn.cursor()
     try:
-        # Vérifier si le document existe déjà
-        cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (result['filename'],))
-        existing = cur.fetchone()
+        unique_key = f"{result['source']}/{result['relative_path']}".replace("\\", "/")
 
-        if existing:
-            return 0  # Ignoré
+        cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (unique_key,))
+        if cur.fetchone():
+            return 0
 
-        # Nouveau document
         cur.execute(
             'INSERT INTO "SourceDocument" (id, content, created_at) '
             'VALUES (gen_random_uuid(), %s, now()) RETURNING id',
-            (result['filename'],)
+            (unique_key,)
         )
         doc_id = cur.fetchone()[0]
 
-        # Vérifier la colonne article_number
-        cur.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name='SourceDocumentSegment' AND column_name='article_number'
-        """)
-        has_article_number = cur.fetchone() is not None
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocumentSegment' AND column_name='article_number'""")
+        has_article = cur.fetchone() is not None
 
-        # Insérer les chunks en batch
-        if has_article_number:
-            chunk_rows = [
-                (
-                    chunk['text'],
-                    doc_id,
-                    json.dumps(chunk['embedding']),
-                    chunk['chunk_index'],
-                    chunk['page_number'],
-                    chunk['tags'],
-                    chunk['article_number'],
-                )
-                for chunk in result['chunks']
-            ]
+        if has_article:
+            rows = [(c['text'], doc_id, json.dumps(c['embedding']), c['chunk_index'],
+                     c['page_number'], c['tags'], c['article_number']) for c in result['chunks']]
             cur.executemany(
                 '''INSERT INTO "SourceDocumentSegment"
                    (id, content, "sourceDocumentid", vector, "createdAt",
                     chunk_index, page_number, tags, article_number)
                    VALUES (gen_random_uuid(), %s, %s, %s::vector, now(), %s, %s, %s, %s)''',
-                chunk_rows,
+                rows,
             )
         else:
-            chunk_rows = [
-                (
-                    chunk['text'],
-                    doc_id,
-                    json.dumps(chunk['embedding']),
-                    chunk['chunk_index'],
-                    chunk['page_number'],
-                    json.dumps(chunk['tags']),
-                )
-                for chunk in result['chunks']
-            ]
+            rows = [(c['text'], doc_id, json.dumps(c['embedding']), c['chunk_index'],
+                     c['page_number'], json.dumps(c['tags'])) for c in result['chunks']]
             cur.executemany(
                 '''INSERT INTO "SourceDocumentSegment"
                    (id, content, "sourceDocumentid", vector, "createdAt",
                     chunk_index, page_number, tags, article_number)
                    VALUES (gen_random_uuid(), %s, %s, %s::vector, now(), %s, %s, %s, 0)''',
-                chunk_rows,
+                rows,
             )
 
         conn.commit()
         return len(result['chunks'])
-
     except Exception as e:
         conn.rollback()
         print(f"  ❌ Erreur insertion: {e}")
@@ -486,73 +412,69 @@ def insert_document(conn, result):
 
 
 # ─────────────────────────────────────────────
-# TRAITEMENT D'UN SEUL PDF - OPTIMISÉ
+# TRAITEMENT D'UN PDF
 # ─────────────────────────────────────────────
 def process_and_insert(pdf_info, conn, log_buf: deque):
-    """Extrait, encode et insère UNIQUEMENT les nouveaux PDFs"""
-    filename = pdf_info['filename']
-    filepath = pdf_info['path']
-    relative_path = pdf_info['relative_path']
+    filename       = pdf_info['filename']
+    filepath       = pdf_info['path']
+    relative_path  = pdf_info['relative_path']
+    source         = pdf_info['source']
+    unique_key     = f"{source}/{relative_path}".replace("\\", "/")
 
-    def log(msg):
-        log_buf.append(msg)
+    def log(msg): log_buf.append(msg)
 
-    # Vérification rapide en DB
     cur = conn.cursor()
-    cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (filename,))
+    cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (unique_key,))
     exists = cur.fetchone() is not None
     cur.close()
-
     if exists and SKIP_EXISTING:
-        save_progress(filename, 'skipped')
+        save_progress(unique_key, 'skipped')
         return True, 0, 'skipped'
 
     try:
-        # Extraction avec timeout global (thread-based, compatible Windows)
         full_text, num_pages, error = _run_with_timeout(
             extract_from_pdf, PDF_EXTRACTION_TIMEOUT, filepath
         )
-
         if error or not full_text:
-            log(f"❌ {filename[:60]}: {error or 'Aucun texte'}")
-            save_progress(filename, 'error')
+            log(f"❌ {unique_key[:65]}: {error or 'Aucun texte'}")
+            save_progress(unique_key, 'error')
             return False, 0, 'error'
 
         chunks_text = chunk_text_by_words(full_text)
         if not chunks_text:
-            log(f"❌ {filename[:60]}: Aucun chunk généré")
-            save_progress(filename, 'error')
+            save_progress(unique_key, 'error')
             return False, 0, 'error'
 
-        # Embeddings par batch
+        # Métadonnées du document
+        doc_meta = extract_legal_metadata(full_text, filename, source)
+
+        # Embeddings batch
         embeddings = []
         for i in range(0, len(chunks_text), EMBEDDING_BATCH_SIZE):
             batch = chunks_text[i:i + EMBEDDING_BATCH_SIZE]
             try:
-                batch_embeddings = embedding_model.encode(batch, show_progress_bar=False)
-                embeddings.extend(batch_embeddings)
+                embeddings.extend(embedding_model.encode(batch, show_progress_bar=False))
             except Exception as e:
-                log(f"⚠️ {filename[:50]}: erreur embedding batch — {e}")
+                log(f"⚠️ {filename[:50]}: embedding — {e}")
                 continue
             gc.collect()
 
         if len(embeddings) != len(chunks_text):
             chunks_text = chunks_text[:len(embeddings)]
 
-        chunks = []
-        for idx, (chunk, emb) in enumerate(zip(chunks_text, embeddings)):
-            chunks.append({
-                'text': chunk,
-                'embedding': emb.tolist(),
-                'chunk_index': idx,
-                'page_number': min((idx * CHUNK_SIZE // 500) + 1, num_pages or 1),
-                'tags': generate_tags(chunk, filename),
-                'article_number': extract_article_number(chunk),
-            })
+        chunks = [{
+            'text': c,
+            'embedding': e.tolist(),
+            'chunk_index': i,
+            'page_number': min((i * CHUNK_SIZE // 500) + 1, num_pages or 1),
+            'tags': generate_tags(c, filename, doc_meta),
+            'article_number': extract_article_number(c),
+        } for i, (c, e) in enumerate(zip(chunks_text, embeddings))]
 
         result = {
             'filename': filename,
             'relative_path': relative_path,
+            'source': source,
             'num_pages': num_pages or 1,
             'chunks': chunks,
         }
@@ -561,208 +483,166 @@ def process_and_insert(pdf_info, conn, log_buf: deque):
             inserted = insert_document(conn, result)
 
         if inserted > 0:
-            log(f"✅ {relative_path[:65]} → {inserted} chunks")
-        save_progress(filename, 'inserted')
+            log(f"✅ [{source}] {relative_path[:55]} → {inserted} chunks")
+        save_progress(unique_key, 'inserted')
         return True, inserted, 'inserted'
 
     except TimeoutError:
-        log(f"⏱️ {filename[:60]}: timeout global ({PDF_EXTRACTION_TIMEOUT}s)")
-        save_progress(filename, 'timeout')
+        log(f"⏱️ {unique_key[:65]}: timeout")
+        save_progress(unique_key, 'timeout')
         return False, 0, 'timeout'
     except MemoryError:
-        log(f"💾 {filename[:60]}: mémoire insuffisante")
+        log(f"💾 {unique_key[:65]}: mémoire")
         gc.collect()
-        save_progress(filename, 'memory')
+        save_progress(unique_key, 'memory')
         return False, 0, 'memory'
     except Exception as e:
-        log(f"❌ {filename[:60]}: {e}")
-        save_progress(filename, 'error')
+        log(f"❌ {unique_key[:65]}: {e}")
+        save_progress(unique_key, 'error')
         return False, 0, 'error'
 
 
 # ─────────────────────────────────────────────
-# GESTION DES FICHIERS
+# FICHIERS — parcours des 2 dossiers
 # ─────────────────────────────────────────────
-def get_pdf_files_recursive(folder):
-    pdf_files = []
-    for root, _, files in os.walk(folder):
-        for file in files:
-            if file.endswith('.pdf'):
-                filepath = os.path.join(root, file)
-                try:
-                    size = os.path.getsize(filepath)
-                    pdf_files.append({
-                        'filename': file,
-                        'path': filepath,
-                        'relative_path': os.path.relpath(filepath, folder),
-                        'size': size,
-                    })
-                except:
-                    continue
-    # Trier par taille (petits d'abord)
-    pdf_files.sort(key=lambda x: x['size'])
-    return pdf_files
+def get_pdf_files_recursive():
+    out = []
+    for source, folder in FOLDERS.items():
+        if not os.path.exists(folder):
+            print(f"⚠️  Dossier introuvable: {folder}")
+            continue
+        for root, _, files in os.walk(folder):
+            for f in files:
+                if f.lower().endswith('.pdf'):
+                    fp = os.path.join(root, f)
+                    try:
+                        out.append({
+                            'filename': f,
+                            'path': fp,
+                            'relative_path': os.path.relpath(fp, folder),
+                            'size': os.path.getsize(fp),
+                            'source': source,
+                        })
+                    except: continue
+    out.sort(key=lambda x: x['size'])
+    return out
 
 
 def get_already_indexed(conn):
     cur = conn.cursor()
     cur.execute('SELECT content FROM "SourceDocument"')
-    rows = cur.fetchall()
-    cur.close()
+    rows = cur.fetchall(); cur.close()
     return {r[0] for r in rows}
-
-
-def get_new_files_only(conn):
-    pdf_files = get_pdf_files_recursive(FOLDER)
-    indexed = get_already_indexed(conn)
-    new_files = [info for info in pdf_files if info['filename'] not in indexed]
-    return new_files
 
 
 def show_indexation_status(conn):
     cur = conn.cursor()
-    cur.execute('SELECT COUNT(*) FROM "SourceDocument"')
-    total = cur.fetchone()[0]
-    cur.execute('SELECT COUNT(*) FROM "SourceDocumentSegment"')
-    segments = cur.fetchone()[0]
+    cur.execute('SELECT COUNT(*) FROM "SourceDocument"'); total = cur.fetchone()[0]
+    cur.execute('SELECT COUNT(*) FROM "SourceDocumentSegment"'); seg = cur.fetchone()[0]
     cur.close()
-    return total, segments
+    return total, seg
 
 
 # ─────────────────────────────────────────────
-# POINT D'ENTRÉE PRINCIPAL
+# AFFICHAGE LOG SOUS LA BARRE
 # ─────────────────────────────────────────────
 def _render_log_block(log_buf: deque, width: int = 80):
-    """Affiche les N dernières lignes de log sous la barre tqdm."""
     lines = list(log_buf)
-    print("")  # sauter la ligne de la barre
+    print("")
     for line in lines:
-        # tronquer si trop long pour le terminal
         print(f"  {line[:width - 2]}")
-    # remonter le curseur pour écraser au prochain appel
-    # (+1 pour la ligne vide au-dessus)
-    up = len(lines) + 1
-    print(f"\033[{up}A", end="", flush=True)
+    print(f"\033[{len(lines) + 1}A", end="", flush=True)
 
 
+# ─────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────
 def index_documents():
-    if not os.path.exists(FOLDER):
-        print(f"❌ Le dossier {FOLDER} n'existe pas!")
-        return
-
     print("\n" + "=" * 60)
-    print("📚 INDEXATION OPTIMISÉE - NOUVEAUX UNIQUEMENT")
+    print("📚 INDEXATION JIBAYA + JORT")
     print("=" * 60)
-    print(f"📁 Dossier      : {FOLDER}")
-    print(f"🔄 Workers      : {PARALLEL_WORKERS}")
-    print(f"⏱️  Timeout      : Docling {DOCLING_TIMEOUT}s / global {PDF_EXTRACTION_TIMEOUT}s")
-    print(f"📂 Progress file: {PROGRESS_FILE}")
+    for name, folder in FOLDERS.items():
+        ok = "✅" if os.path.exists(folder) else "❌"
+        print(f"  {ok} {name:<8} → {folder}")
+    print(f"🔄 Workers: {PARALLEL_WORKERS}")
+    print(f"⏱️  Timeout: Docling {DOCLING_TIMEOUT}s / global {PDF_EXTRACTION_TIMEOUT}s")
     print("=" * 60 + "\n")
 
     try:
         conn = psycopg.connect(DB_URL)
-        print("✅ Connecté à la base de données")
+        print("✅ Connecté à la DB")
     except Exception as e:
-        print(f"❌ Erreur de connexion: {e}")
-        return
+        print(f"❌ Connexion DB: {e}"); return
 
-    # Statut actuel
     total_docs, total_segments = show_indexation_status(conn)
-    print(f"📊 Déjà indexés : {total_docs} docs / {total_segments} segments\n")
+    print(f"📊 Déjà en DB: {total_docs} docs / {total_segments} segments\n")
 
-    # Charger les fichiers déjà traités (DB + progress file)
-    already_done = load_progress()
-
-    # Tous les PDFs du dossier
-    all_pdfs = get_pdf_files_recursive(FOLDER)
-    # Exclure ceux déjà en DB OU déjà dans le progress file
+    already_done  = load_progress()
+    all_pdfs      = get_pdf_files_recursive()
     indexed_in_db = get_already_indexed(conn)
-    files_to_index = [
-        f for f in all_pdfs
-        if f['filename'] not in indexed_in_db and f['filename'] not in already_done
-    ]
+
+    files_to_index = []
+    for f in all_pdfs:
+        key = f"{f['source']}/{f['relative_path']}".replace("\\", "/")
+        if key in indexed_in_db or key in already_done:
+            continue
+        files_to_index.append(f)
 
     if not files_to_index:
         print("✨ Aucun nouveau document à indexer!")
-        conn.close()
-        return
+        conn.close(); return
 
-    skipped_by_progress = len([f for f in all_pdfs if f['filename'] in already_done])
-    print(f"📋 {len(all_pdfs)} PDFs trouvés — {len(indexed_in_db)} en DB"
-          f"{f', {skipped_by_progress} ignorés (progress file)' if skipped_by_progress else ''}"
-          f" → {len(files_to_index)} à traiter\n")
+    # Stats par source
+    by_src = {}
+    for f in files_to_index:
+        by_src[f['source']] = by_src.get(f['source'], 0) + 1
+    print(f"📋 {len(all_pdfs)} PDFs trouvés — {len(files_to_index)} à traiter:")
+    for s, n in by_src.items():
+        print(f"     • {s}: {n}")
+    print()
 
-    start_time = time.time()
-    total_chunks = 0
-    success_count = 0
-    skipped_count = 0
-    error_count = 0
+    start = time.time()
+    total_chunks = success = skipped = errors = 0
 
-    # Buffer circulaire: 10 dernières entrées de log
     LOG_LINES = 10
     log_buf: deque = deque(maxlen=LOG_LINES)
-    # Réserver de l'espace pour le bloc de log sous la barre
     print("\n" * LOG_LINES, end="")
     print(f"\033[{LOG_LINES + 1}A", end="", flush=True)
 
-    bar_format = (
-        "  {l_bar}{bar}| {n_fmt}/{total_fmt} "
-        "[{elapsed}<{remaining}, {rate_fmt}] "
-        "✅{postfix[ok]} ❌{postfix[err]}"
-    )
-
     with tqdm(
-        total=len(files_to_index),
-        unit="doc",
+        total=len(files_to_index), unit="doc",
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
         postfix={"✅": 0, "⏭": 0, "❌": 0},
         dynamic_ncols=True,
     ) as pbar:
-
-        with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
-            futures = {
-                executor.submit(process_and_insert, pdf, conn, log_buf): pdf
-                for pdf in files_to_index
-            }
-
-            for future in as_completed(futures):
-                ok, chunks, status = future.result()
-
-                if status == 'skipped':
-                    skipped_count += 1
+        with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as ex:
+            futures = {ex.submit(process_and_insert, pdf, conn, log_buf): pdf for pdf in files_to_index}
+            for fut in as_completed(futures):
+                ok, chunks, status = fut.result()
+                if status == 'skipped': skipped += 1
                 elif status == 'inserted' and ok:
-                    success_count += 1
-                    total_chunks += chunks
-                else:
-                    error_count += 1
-
-                pbar.set_postfix({"✅": success_count, "⏭": skipped_count, "❌": error_count})
+                    success += 1; total_chunks += chunks
+                else: errors += 1
+                pbar.set_postfix({"✅": success, "⏭": skipped, "❌": errors})
                 pbar.update(1)
-
-                # Redessiner le bloc de log sous la barre
                 _render_log_block(log_buf)
-
                 gc.collect()
 
-    # Descendre après le bloc de log
-    print(f"\033[{LOG_LINES + 1}B", end="", flush=True)
-    print()
+    print(f"\033[{LOG_LINES + 1}B", end="", flush=True); print()
 
     conn.close()
-    elapsed = time.time() - start_time
-
+    elapsed = time.time() - start
     print("\n" + "=" * 60)
-    print("📊 RÉSUMÉ DE L'INDEXATION")
+    print("📊 RÉSUMÉ")
     print("=" * 60)
-    print(f"✅ Nouveaux documents indexés : {success_count}")
-    print(f"⏭️  Ignorés (déjà traités)    : {skipped_count}")
-    print(f"❌ Échecs                     : {error_count}")
-    print(f"📦 Total nouveaux chunks      : {total_chunks}")
-    print(f"⏱️  Temps total                : {elapsed:.1f}s")
-    if success_count > 0:
-        print(f"   ({elapsed / success_count:.1f}s/doc en moyenne)")
-    print(f"\n💾 Progress sauvegardé dans : {PROGRESS_FILE}")
-    print("✨ Indexation terminée!")
+    print(f"✅ Indexés     : {success}")
+    print(f"⏭️  Ignorés    : {skipped}")
+    print(f"❌ Échecs      : {errors}")
+    print(f"📦 Chunks      : {total_chunks}")
+    print(f"⏱️  Temps       : {elapsed:.1f}s")
+    if success: print(f"   ({elapsed/success:.1f}s/doc)")
+    print(f"\n💾 Progress: {PROGRESS_FILE}")
+    print("✨ Terminé!")
 
 
 if __name__ == "__main__":
