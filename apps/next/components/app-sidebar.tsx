@@ -1,5 +1,6 @@
 "use client"
-
+import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { generateId } from "ai"
@@ -13,6 +14,14 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   SearchIcon,
   SparklesIcon,
   ScaleIcon,
@@ -20,10 +29,11 @@ import {
   Settings2Icon,
   HelpCircleIcon,
   ClockIcon,
+  LogOutIcon,
+  UserIcon,
 } from "lucide-react"
 import * as React from "react"
 import { authClient } from "@/lib/auth-client"
-
 const data = {
   navMain: [
     {
@@ -40,12 +50,12 @@ const data = {
   navSecondary: [
     {
       title: "Paramètres",
-      url: "#",
+      url: "/dashboard/settings",
       icon: <Settings2Icon />,
     },
     {
       title: "Aide",
-      url: "#",
+      url: "/dashboard/guide",
       icon: <HelpCircleIcon />,
     },
   ],
@@ -54,6 +64,7 @@ const data = {
 export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }) {
   const router = useRouter()
   const [chats, setChats] = useState<any[]>([])
+
 
   const fetchChats = () => {
     const url = searchQuery
@@ -114,6 +125,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = authClient.useSession()
   const [searchQuery, setSearchQuery] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false);
 
   const handleNewChat = () => {
     const newId = generateId()
@@ -121,11 +133,33 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setTimeout(() => window.dispatchEvent(new Event('chat-updated')), 500)
   }
 
+  const handleLogout = async () => {
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/login")
+        },
+      },
+    })
+  }
+
   const navMainWithActions = data.navMain.map(item => {
     if (item.title === "Nouvelle conversation") return { ...item, onClick: handleNewChat }
     if (item.title === "Rechercher") return { ...item, onClick: () => setSearchOpen(v => !v) }
     return item
   })
+
+  const navSecondaryWithActions = data.navSecondary.map(item => ({
+    ...item,
+    onClick: () => router.push(item.url),
+  }))
+
+  const initials = session?.user?.name
+    ?.split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) ?? '?'
 
   return (
     <Sidebar className="border-r border-sidebar-border/50" {...props}>
@@ -135,18 +169,47 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <div className="w-7 h-7 rounded-lg bg-sidebar-primary/20 flex items-center justify-center shrink-0">
-            <ScaleIcon className="w-4 h-4 text-sidebar-primary" />
-          </div>
+         <span> 
           <div>
-            <span className="font-serif text-sm font-bold text-sidebar-foreground tracking-tight">
-              Silk<span className="text-sidebar-primary">Bot</span>
+                      <Link href="/" className="flex items-center gap-2 mr-2">
+                        <div
+                          className="flex size-6 items-center justify-center rounded-md overflow-hidden"
+                          style={{ background: 'var(--primary)' }}
+                        >
+                          {logoError ? (
+                            <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
+                          ) : (
+                            <Image
+                              src="/silkbot-logo-white.png"
+                              alt="SilkBot Logo"
+                              width={24}
+                              height={24}
+                              className="object-contain"
+                              onError={() => setLogoError(true)}
+                            />
+                          )}
+                        </div>
+                        {!logoError && (
+                          <Image
+                            src="/silkbot-black.png"
+                            alt="SilkBot"
+                            width={70}
+                            height={22}
+                            className="object-contain block dark:hidden"
+                            onError={() => setLogoError(true)}
+                          />
+                        )}
+                      </Link>
+              </div>
             </span>
-            <p className="text-[10px] text-sidebar-foreground/35 font-light leading-none mt-0.5">
+            <div>
+              <p className="text-[10px] text-sidebar-foreground/35 font-light leading-none mt-0.5">
               Plateforme juridique
             </p>
+            </div>
+            
           </div>
-        </div>
+        
 
         <SidebarSeparator className="opacity-20 mx-3" />
 
@@ -190,39 +253,54 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* ── Footer ── */}
       <SidebarFooter className="border-t border-sidebar-border/30 pb-3 pt-2">
-        <div className="px-2 space-y-0.5">
-          {data.navSecondary.map((item) => (
-            <button
-              key={item.title}
-              className="group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg
-                text-sidebar-foreground/40 hover:text-sidebar-accent-foreground
-                hover:bg-sidebar-accent/40 transition-all text-xs font-light"
-            >
-              {React.cloneElement(item.icon as React.ReactElement, {
-                className: "w-3.5 h-3.5 shrink-0"
-              })}
-              {item.title}
-            </button>
-          ))}
-        </div>
+        
 
         <SidebarSeparator className="opacity-20 mx-3 my-1" />
 
-        {/* User info */}
+        {/* User info — click to open account menu */}
         {session?.user && (
-          <div className="flex items-center gap-2.5 px-4 py-1.5">
-            <div className="w-6 h-6 rounded-md bg-sidebar-accent/50 flex items-center justify-center text-[10px] font-medium text-sidebar-accent-foreground shrink-0">
-              {session.user.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) ?? '?'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-medium text-sidebar-foreground/70 truncate leading-tight">
-                {session.user.name}
-              </div>
-              <div className="text-[10px] text-sidebar-foreground/30 font-light truncate leading-tight">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-full flex items-center gap-2.5 px-4 py-1.5 rounded-lg
+                  hover:bg-sidebar-accent/40 transition-colors text-left"
+              >
+                <div className="w-6 h-6 rounded-md bg-sidebar-accent/50 flex items-center justify-center text-[10px] font-medium text-sidebar-accent-foreground shrink-0">
+                  {initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-medium text-sidebar-foreground/70 truncate leading-tight">
+                    {session.user.name}
+                  </div>
+                  <div className="text-[10px] text-sidebar-foreground/30 font-light truncate leading-tight">
+                    {session.user.email}
+                  </div>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56">
+              <DropdownMenuLabel className="font-light text-[11px] text-muted-foreground">
                 {session.user.email}
-              </div>
-            </div>
-          </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+                <Settings2Icon className="w-3.5 h-3.5 mr-2" />
+                Paramètres
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/dashboard/guide')}>
+                <HelpCircleIcon className="w-3.5 h-3.5 mr-2" />
+                Aide
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-destructive focus:text-destructive"
+              >
+                <LogOutIcon className="w-3.5 h-3.5 mr-2" />
+                Se déconnecter
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </SidebarFooter>
 

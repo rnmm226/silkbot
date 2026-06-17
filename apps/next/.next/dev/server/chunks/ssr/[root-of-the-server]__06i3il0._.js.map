@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 13, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/rnmdr/OneDrive/Documents/Stage/chatbot/apps/next/app/favicon.ico.mjs%20%28structured%20image%20object%29"],"sourcesContent":["import src from \"IMAGE\";\nexport default { src, width: 256, height: 256 }\n"],"names":["src","width","height"],"mappings":";;;;AAAA;;uCACe;IAAEA,KAAAA,mJAAG;IAAEC,OAAO;IAAKC,QAAQ;AAAI"}},
-    {"offset": {"line": 28, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/rnmdr/OneDrive/Documents/Stage/chatbot/apps/next/app/dashboard/page.tsx"],"sourcesContent":["import { redirect } from 'next/navigation';\nimport { createChat } from '@/apps/next/util/chat-store';\n\nexport default async function DashboardPage(): Promise<never> {\n  const id = await createChat();\n  redirect(`/dashboard/${id}`);\n}"],"names":["DashboardPage","id","createChat"],"mappings":";;;;AAAA;AAAA;;;;;;;;AAGe,eAAeA;IAC5B,MAAMC,KAAK,MAAMC;IACjB,IAAA,iMAAQ,EAAC,CAAC,WAAW,EAAED,IAAI;AAC7B"}}]
-}

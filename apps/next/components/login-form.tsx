@@ -45,15 +45,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="border-border shadow-md overflow-hidden animate-slideUp">
+      <Card className="border-border shadow-md overflow-hidden animate-slideUp" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
         {/* accent bar */}
-        <div className="h-[3px] w-full bg-primary" />
+        <div className="h-[3px] w-full" style={{ background: 'var(--primary)' }} />
 
         <CardHeader className="text-center pb-2 pt-6">
-          <CardTitle className="font-serif text-2xl font-bold text-foreground">
+          <CardTitle className="font-serif text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
             Bienvenue
           </CardTitle>
-          <CardDescription className="text-muted-foreground font-light">
+          <CardDescription className="font-light" style={{ color: 'var(--muted-foreground)' }}>
             Connectez-vous à votre compte
           </CardDescription>
         </CardHeader>
@@ -62,13 +62,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               {/* Google */}
-              <Field className="animate-fadeUp [animation-delay:200ms] opacity-0 [animation-fill-mode:forwards]">
+              <Field>
                 <Button
                   variant="outline"
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="w-full border-border hover:bg-muted hover:-translate-y-px active:scale-95 transition-all duration-150 font-normal"
+                  className="w-full"
+                  style={{ 
+                    borderColor: 'var(--border)', 
+                    background: 'transparent', 
+                    color: 'var(--foreground)',
+                    padding: '10px 16px',
+                    borderRadius: '8px'
+                  }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-4 h-4 mr-2 shrink-0">
                     <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="currentColor" />
@@ -77,70 +84,102 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 </Button>
               </Field>
 
-              <FieldSeparator className="animate-fadeIn [animation-delay:300ms] opacity-0 [animation-fill-mode:forwards] *:data-[slot=field-separator-content]:bg-card *:data-[slot=field-separator-content]:text-muted-foreground *:data-[slot=field-separator-content]:text-xs">
-                ou continuer avec email
+              <FieldSeparator className="my-4">
+                <span style={{ background: 'var(--card)', color: 'var(--muted-foreground)', padding: '0 8px', fontSize: '12px' }}>
+                  ou continuer avec email
+                </span>
               </FieldSeparator>
 
               {error && (
-                <div className="text-destructive-foreground text-sm text-center p-2 bg-destructive/10 border border-destructive/20 rounded-lg animate-fadeIn">
+                <div className="text-sm text-center p-2 rounded-lg mb-4"
+                  style={{ color: 'var(--destructive-foreground)', background: 'color-mix(in oklch, var(--destructive) 15%, transparent)', border: '1px solid color-mix(in oklch, var(--destructive) 25%, transparent)' }}>
                   {error}
                 </div>
               )}
 
-              <Field className="animate-fadeUp [animation-delay:350ms] opacity-0 [animation-fill-mode:forwards]">
-                <FieldLabel htmlFor="email" className="font-medium text-sm text-foreground">
+              {/* Email field */}
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
                   Email
-                </FieldLabel>
-                <Input
-                  id="email" type="email" placeholder="m@example.com"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                  required disabled={loading}
-                  className="border-border focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-150"
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="w-full px-3 py-2 rounded-md border transition-all focus:outline-none focus:ring-2"
+                  style={{ 
+                    borderColor: 'var(--border)', 
+                    background: 'var(--background)', 
+                    color: 'var(--foreground)',
+                    borderRadius: '8px'
+                  }}
                 />
-              </Field>
+              </div>
 
-              <Field className="animate-fadeUp [animation-delay:420ms] opacity-0 [animation-fill-mode:forwards]">
+              {/* Password field */}
+              <div className="mb-4">
                 <div className="flex items-center justify-between mb-1">
-                  <FieldLabel htmlFor="password" className="font-medium text-sm text-foreground">
+                  <label htmlFor="password" className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
                     Mot de passe
-                  </FieldLabel>
-                  <a href="/forgot-password" className="text-xs text-primary hover:underline underline-offset-4 transition-colors">
+                  </label>
+                  <a href="/reset-password" className="text-xs transition-colors" style={{ color: 'var(--primary)' }}>
                     Mot de passe oublié ?
                   </a>
                 </div>
-                <Input
-                  id="password" type="password"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  required disabled={loading}
-                  className="border-border focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-150"
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="w-full px-3 py-2 rounded-md border transition-all focus:outline-none focus:ring-2"
+                  style={{ 
+                    borderColor: 'var(--border)', 
+                    background: 'var(--background)', 
+                    color: 'var(--foreground)',
+                    borderRadius: '8px'
+                  }}
                 />
-              </Field>
+              </div>
 
-              <Field className="animate-fadeUp [animation-delay:490ms] opacity-0 [animation-fill-mode:forwards]">
-                <Button
-                  type="submit" disabled={loading}
-                  className="w-full bg-primary text-primary-foreground hover:opacity-90 hover:-translate-y-px active:scale-95 transition-all duration-150 font-medium shadow-sm"
-                >
-                  {loading ? "Connexion..." : "Connexion"}
-                </Button>
-                <FieldDescription className="text-center text-sm text-muted-foreground font-light mt-2">
-                  Pas encore de compte ?{" "}
-                  <a href="/register" className="text-primary font-medium hover:underline underline-offset-4">
-                    Inscription
-                  </a>
-                </FieldDescription>
-              </Field>
+              {/* Submit button */}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full font-medium shadow-sm mt-2"
+                style={{ 
+                  background: 'var(--primary)', 
+                  color: 'var(--primary-foreground)',
+                  padding: '10px 16px',
+                  borderRadius: '8px'
+                }}
+              >
+                {loading ? "Connexion..." : "Connexion"}
+              </Button>
+
+              <p className="text-center text-sm font-light mt-4" style={{ color: 'var(--muted-foreground)' }}>
+                Pas encore de compte ?{" "}
+                <a href="/register" className="font-medium" style={{ color: 'var(--primary)' }}>
+                  Inscription
+                </a>
+              </p>
             </FieldGroup>
           </form>
         </CardContent>
       </Card>
 
-      <FieldDescription className="px-6 text-center text-xs text-muted-foreground font-light animate-fadeIn [animation-delay:600ms] opacity-0 [animation-fill-mode:forwards]">
+      <p className="text-center text-xs font-light" style={{ color: 'var(--muted-foreground)' }}>
         En continuant, vous acceptez nos{" "}
-        <a href="#" className="text-primary hover:underline underline-offset-4">Conditions d&apos;utilisation</a>{" "}
+        <a href="#" className="transition-colors" style={{ color: 'var(--primary)' }}>Conditions d&apos;utilisation</a>{" "}
         et notre{" "}
-        <a href="#" className="text-primary hover:underline underline-offset-4">Politique de confidentialité</a>.
-      </FieldDescription>
+        <a href="#" className="transition-colors" style={{ color: 'var(--primary)' }}>Politique de confidentialité</a>.
+      </p>
     </div>
   );
 }

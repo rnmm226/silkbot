@@ -1,0 +1,7 @@
+{
+    "name": "silkcrawl",
+    "scripts": {
+        "main": "python main.py",
+        "main:jort": ".venv\\Scripts\\python.exe main_jort.py"
+    }
+}

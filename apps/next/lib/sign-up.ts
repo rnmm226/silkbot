@@ -13,7 +13,7 @@ export async function login(formData: FormData) {
   }
 
   try {
-    const { data, error } = await authClient.signIn.email({
+    const { error } = await authClient.signIn.email({
       email: email,
       password: password,
       callbackURL: "/dashboard",

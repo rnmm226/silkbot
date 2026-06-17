@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-/.next/
+**/.next/
 /out/
 
 # production
@@ -44,3 +44,10 @@ next-env.d.ts
 
 .turbo
 **/.venv
+
+apps/next/.next/
+apps/SilkBot/**/*.pdf
+apps/Silkcrawl/**/*.pdf
+apps/next/.next/**
+
+**/.env

@@ -1,5 +1,6 @@
 import { RegisterForm } from "@/components/register-form";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function RegisterPage() {
   return (
@@ -10,10 +11,22 @@ export default function RegisterPage() {
 
       <div className="relative z-10 flex w-full max-w-sm flex-col gap-5 animate-slideUp">
         <Link href="/" className="flex items-center justify-center gap-2 font-medium">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold animate-pulseRing">
-            ⚖
+          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold animate-pulseRing overflow-hidden">
+            <Image 
+              src="/silkbot-logo-white.png"
+              alt="SilkBot Logo"
+              width={32}
+              height={32}
+              className="object-contain"
+            />
           </div>
-          <span className="font-serif text-lg font-bold text-primary">SilkBot</span>
+          <Image 
+            src="/silkbot-black.png"
+            alt="SilkBot"
+            width={90}
+            height={28}
+            className="object-contain"
+          />
         </Link>
         <RegisterForm />
       </div>

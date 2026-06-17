@@ -104,10 +104,14 @@ model SourceDocument {
 }
 
 model SourceDocumentSegment {
-  id               String                 @id @default(cuid())
-  content          String                 @db.Text
-  sourceDocument   SourceDocument?        @relation(fields: [sourceDocumentid], references: [id])
+  id               String   @id @default(cuid())
+  content          String
   sourceDocumentid String?
-  embedding        Unsupported("vector")? @map("vector")
-  createdAt        DateTime               @default(now()) @map("created_at")
+  vector           Unsupported("vector")?  // ← Utiliser Unsupported
+  createdAt        DateTime @default(now())
+  chunk_index      Int
+  page_number      Int
+  tags             String[]
+  article_number   Int
+  sourceDocument   SourceDocument? @relation(fields: [sourceDocumentid], references: [id])
 }

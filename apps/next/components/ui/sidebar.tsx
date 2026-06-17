@@ -6,7 +6,7 @@ import Link from "next/link"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "@radix-ui/react-slot"
 
-import { useIsMobile } from "@/apps/next/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -668,51 +668,10 @@ function SidebarMenuSubButton({
   )
 }
 
-// Composant Sidebar principal pour les conversations
-export default function SidebarComponent() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
+// SUPPRIMEZ CE COMPOSANT (il est en conflit)
+// export default function SidebarComponent() { ... }
 
-  useEffect(() => {
-    fetch("/api/conversations")
-      .then((res) => res.json())
-      .then((data) => {
-        setConversations(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
-
-  return (
-    <aside className="w-64 bg-gray-100 p-4 border-r">
-      <h2 className="font-bold mb-4">Conversations</h2>
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
-      ) : (
-        <ul>
-          {conversations.map((conv) => (
-            <li key={conv.id} className="mb-2">
-              <Link
-                href={`/chat/${conv.id}`}
-                className="block p-2 rounded hover:bg-gray-200"
-              >
-                {conv.title}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </aside>
-  );
-}
-
+// Exportez tout ce dont vous avez besoin
 export {
   Sidebar,
   SidebarContent,

@@ -1,0 +1,17 @@
+[
+  {
+    "title": "journal-officiel 1975 issue 001 (French)",
+    "pdf_url": "https://lake.jort.tn/journal-officiel/fr/1975/001.pdf",
+    "reason": "HTTPSConnectionPool(host='lake.jort.tn', port=443): Read timed out."
+  },
+  {
+    "title": "annonces-legales 2012 issue 001 (French)",
+    "pdf_url": "https://lake.jort.tn/annonces-legales/fr/2012/001.pdf",
+    "reason": "HTTPSConnectionPool(host='lake.jort.tn', port=443): Read timed out. (read timeout=30)"
+  },
+  {
+    "title": "annonces-legales 2015 issue 001 (Arabic)",
+    "pdf_url": "https://lake.jort.tn/annonces-legales/ar/2015/001.pdf",
+    "reason": "HTTPSConnectionPool(host='lake.jort.tn', port=443): Read timed out. (read timeout=30)"
+  }
+]
