@@ -2,6 +2,8 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { admin } from "better-auth/plugins"
+
 
 // Définir les types pour les callbacks
 type SignInParams = {
@@ -124,13 +126,33 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
+	plugins: [
+    admin({
+        defaultRole: "user",
+        adminRole: "admin",  // ← dit à better-auth quel role = admin
+    })
+],
+session: {
+    additionalFields: {
+      role: {
+        type: "string",
+      }
+    }
+  },
+   user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "user",
+        input: false,
+      },
+    },
+  },
   callbacks: {
     async signIn({ user, account, profile }: SignInParams) {
       console.log("Utilisateur connecté:", user.email);
       return true;
     },
-    async redirect({ url: _url, baseUrl }: RedirectParams) {
-      return `${baseUrl}/dashboard`;
-    },
   },
-});
+})

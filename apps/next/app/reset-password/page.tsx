@@ -280,7 +280,7 @@ function ResetPasswordContent() {
           <p className="text-sm text-muted-foreground">
             Veuillez demander un nouveau lien de réinitialisation.
           </p>
-          <Link href="/forgot-password">
+          <Link href="/forgot-password?force=true">
             <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               Demander un nouveau lien
             </Button>
@@ -309,7 +309,7 @@ function ResetPasswordContent() {
           <p className="text-sm text-muted-foreground">
             Vous allez être redirigé vers la page de connexion...
           </p>
-          <Link href="/login">
+          <Link href="/login?force=true">
             <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               Aller à la connexion
             </Button>
@@ -372,7 +372,7 @@ function ResetPasswordContent() {
       
       <div className="text-center mt-6">
         <Link 
-          href="/login" 
+          href="/login?force=true" 
           className="text-sm transition-colors hover:underline underline-offset-4 text-primary hover:text-primary/80"
         >
           Retour à la connexion

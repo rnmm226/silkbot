@@ -77,7 +77,7 @@ export default function SettingsPage() {
   const [nameValue, setNameValue] = useState(session?.user?.name || "")
   const [nameSaving, setNameSaving] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
-
+  
   useEffect(() => {
     setNameValue(session?.user?.name || "")
   }, [session?.user?.name])
@@ -95,6 +95,7 @@ export default function SettingsPage() {
         },
       },
     })
+    
     setNameSaving(false)
   }
 

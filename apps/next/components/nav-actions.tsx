@@ -7,101 +7,132 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
-  Settings2Icon,
-  FileTextIcon,
+  PencilIcon,
+  ArchiveIcon,
   LinkIcon,
-  CopyIcon,
-  CornerUpRightIcon,
+  FileDownIcon,
   Trash2Icon,
-  CornerUpLeftIcon,
+  RotateCcwIcon,
+  FlagIcon,
   GalleryVerticalEndIcon,
-  TrashIcon,
-  BellIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   StarIcon,
   MoreHorizontalIcon,
   ShieldCheckIcon,
   UsersIcon,
   DatabaseIcon,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
-const data = [
-  [
-    { label: "Personnaliser", icon: Settings2Icon },
-    { label: "Convertir en doc", icon: FileTextIcon },
-  ],
-  [
-    { label: "Copier le lien", icon: LinkIcon },
-    { label: "Dupliquer", icon: CopyIcon },
-    { label: "Déplacer vers", icon: CornerUpRightIcon },
-    { label: "Supprimer", icon: Trash2Icon },
-  ],
-  [
-    { label: "Annuler", icon: CornerUpLeftIcon },
-    { label: "Historique", icon: GalleryVerticalEndIcon },
-    { label: "Corbeille", icon: TrashIcon },
-    { label: "Notifications", icon: BellIcon },
-  ],
-  [
-    { label: "Importer", icon: ArrowUpIcon },
-    { label: "Exporter", icon: ArrowDownIcon },
-  ],
-];
+// ─────────────────────────────────────────────
+// Actions propres à une conversation (et non à un
+// document générique type Notion) : c'est ce qui
+// fait que le menu "sent" un vrai produit de chat.
+// ─────────────────────────────────────────────
+type ActionItem = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onClick?: () => void;
+  danger?: boolean;
+};
 
-// ✅ Actions admin
 const adminActions = [
   { label: "Administration", icon: ShieldCheckIcon, href: "/admin" },
   { label: "Gestion des utilisateurs", icon: UsersIcon, href: "/admin/users" },
   { label: "Base documentaire", icon: DatabaseIcon, href: "/admin/documents" },
 ];
 
-export function NavActions() {
+export type NavActionsProps = {
+  isStarred?: boolean;
+  onToggleStar?: () => void;
+  onRename?: () => void;
+  onArchive?: () => void;
+  onShare?: () => void;
+  onExportPdf?: () => void;
+  onDelete?: () => void;
+  onRegenerate?: () => void;
+  onReportIssue?: () => void;
+  onViewHistory?: () => void;
+};
+
+export function NavActions({
+  isStarred,
+  onToggleStar,
+  onRename,
+  onArchive,
+  onShare,
+  onExportPdf,
+  onDelete,
+  onRegenerate,
+  onReportIssue,
+  onViewHistory,
+}: NavActionsProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [starred, setStarred] = React.useState(false);
-  const { data: session } = useSession();
+  const [internalStarred, setInternalStarred] = React.useState(false);
+  const { data: session } = authClient.useSession();
   const router = useRouter();
-  
+
   const isAdmin = session?.user?.role === "admin";
+  const starred = isStarred ?? internalStarred;
+
+  const toggleStar = () => {
+    if (onToggleStar) onToggleStar();
+    else setInternalStarred((v) => !v);
+  };
+
+  const actionGroups: ActionItem[][] = [
+    [
+      { label: "Renommer la conversation", icon: PencilIcon, onClick: onRename },
+      { label: "Archiver", icon: ArchiveIcon, onClick: onArchive },
+    ],
+    [
+      { label: "Partager", icon: LinkIcon, onClick: onShare },
+      { label: "Exporter en PDF", icon: FileDownIcon, onClick: onExportPdf },
+      { label: "Supprimer", icon: Trash2Icon, onClick: onDelete, danger: true },
+    ],
+    [
+      { label: "Régénérer la dernière réponse", icon: RotateCcwIcon, onClick: onRegenerate },
+      { label: "Signaler une erreur", icon: FlagIcon, onClick: onReportIssue },
+      { label: "Historique des échanges", icon: GalleryVerticalEndIcon, onClick: onViewHistory },
+    ],
+  ];
 
   return (
     <div className="flex items-center gap-1">
-      {/* Star button */}
+      {/* Favori */}
       <Button
         variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-        onClick={() => setStarred(v => !v)}
+        size="icon-sm"
+        onClick={toggleStar}
+        aria-pressed={starred}
         title={starred ? "Retirer des favoris" : "Ajouter aux favoris"}
+        className={cn(
+          "transition-colors",
+          starred ? "text-primary" : "text-muted-foreground hover:text-foreground",
+        )}
       >
-        <StarIcon
-          className={`w-4 h-4 transition-colors ${starred ? "fill-sidebar-primary text-sidebar-primary" : ""}`}
-        />
+        <StarIcon className={cn("size-4", starred && "fill-primary")} />
       </Button>
 
-      {/* More options */}
+      {/* Menu d'actions */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Plus d'options"
           >
-            <MoreHorizontalIcon className="w-4 h-4" />
+            <MoreHorizontalIcon className="size-4" />
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent
-          className="w-52 p-1 rounded-xl border border-border/60 shadow-lg bg-popover"
-          align="end"
-          sideOffset={6}
-        >
+        <PopoverContent align="end" className="w-60 p-1">
           {isAdmin && (
             <>
-              <div className="space-y-0.5">
+              <div className="py-1">
                 {adminActions.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -113,35 +144,37 @@ export function NavActions() {
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-light transition-colors text-primary hover:text-primary hover:bg-primary/10"
                     >
-                      <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <Icon className="size-4" />
                       {item.label}
                     </button>
                   );
                 })}
               </div>
-              <div className="my-1 h-px bg-border/40 mx-1" />
+              <div className="my-1 h-px bg-border" />
             </>
           )}
 
-          {data.map((group, gi) => (
+          {actionGroups.map((group, gi) => (
             <div key={gi}>
-              {gi > 0 && (
-                <div className="my-1 h-px bg-border/40 mx-1" />
-              )}
-              <div className="space-y-0.5">
+              {gi > 0 && <div className="my-1 h-px bg-border" />}
+              <div className="py-1">
                 {group.map((item) => {
                   const Icon = item.icon;
-                  const isDanger = item.label === "Supprimer" || item.label === "Corbeille";
                   return (
                     <button
                       key={item.label}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-light transition-colors ${
-                        isDanger
-                          ? "text-destructive/70 hover:text-destructive hover:bg-destructive/8"
-                          : "text-popover-foreground/70 hover:text-popover-foreground hover:bg-muted/60"
-                      }`}
+                      onClick={() => {
+                        setIsOpen(false);
+                        item.onClick?.();
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-light transition-colors",
+                        item.danger
+                          ? "text-destructive hover:bg-destructive/10"
+                          : "text-foreground/80 hover:text-foreground hover:bg-accent/60",
+                      )}
                     >
-                      <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <Icon className="size-4" />
                       {item.label}
                     </button>
                   );

@@ -45,6 +45,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 type DocumentItem = {
   id: string;
@@ -172,7 +174,7 @@ export default function AdminDocumentsPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [selectedFileSize, setSelectedFileSize] = useState("aucun fichier");
   const [segmentError, setSegmentError] = useState<string | null>(null);
-
+  const router = useRouter()
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllDocuments, setShowAllDocuments] = useState(false);
@@ -678,7 +680,15 @@ export default function AdminDocumentsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [query, filter]);
-
+  const handleLogout = async () => {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            router.push("/login")
+          },
+        },
+      })
+    }
   return (
     <main className="min-h-screen bg-background text-foreground">
       {notice && (
@@ -739,6 +749,7 @@ export default function AdminDocumentsPage() {
                 />
               </div>
             </div>
+            <Button onClick={handleLogout}>deconnexion</Button>
             <div className="space-y-1">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Administration

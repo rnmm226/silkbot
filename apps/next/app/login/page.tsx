@@ -1,23 +1,8 @@
-"use client";
-
 import { LoginForm } from "@/components/login-form";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useSession } from "next-auth/react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { data: session, status } = useSession();
-
-  // ✅ Rediriger vers admin si déjà connecté en tant qu'admin
-  useEffect(() => {
-    if (status === "authenticated" && session?.user?.role === "admin") {
-      router.push("/admin");
-    }
-  }, [status, session, router]);
-
   return (
     <div className="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10 overflow-hidden">
       {/* blobs */}

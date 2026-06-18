@@ -8,9 +8,8 @@ import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import {
-  Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator,
+  Field, FieldGroup, FieldSeparator,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
@@ -26,17 +25,28 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setError("");
     try {
       const { data, error } = await authClient.signIn.email({ email, password });
-      if (error) { setError(error.message || "Erreur lors de la connexion"); }
-      else if (data) { router.push("/dashboard"); }
-    } catch { setError("Erreur de connexion au serveur"); }
-    finally { setLoading(false); }
+      if (error) {
+        setError(error.message || "Erreur lors de la connexion");
+      } else if (data) {
+        const session = await authClient.getSession();
+        const role = session?.data?.user?.role;
+        router.push(role === "admin" ? "/admin" : "/dashboard");
+      }
+    } catch {
+      setError("Erreur de connexion au serveur");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
-      await authClient.signIn.social({ provider: "google", callbackURL: "/dashboard" });
+      await authClient.signIn.social({ 
+        provider: "google", 
+        callbackURL: "/auth/redirect?force=true"
+      });
     } catch {
       setError("Erreur lors de la connexion avec Google");
       setLoading(false);
@@ -46,7 +56,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="border-border shadow-md overflow-hidden animate-slideUp" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-        {/* accent bar */}
         <div className="h-[3px] w-full" style={{ background: 'var(--primary)' }} />
 
         <CardHeader className="text-center pb-2 pt-6">
@@ -61,7 +70,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         <CardContent className="pt-4">
           <form onSubmit={handleSubmit}>
             <FieldGroup>
-              {/* Google */}
               <Field>
                 <Button
                   variant="outline"
@@ -97,7 +105,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 </div>
               )}
 
-              {/* Email field */}
               <div className="mb-4">
                 <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
                   Email
@@ -120,13 +127,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 />
               </div>
 
-              {/* Password field */}
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-1">
                   <label htmlFor="password" className="block text-sm font-medium" style={{ color: 'var(--foreground)' }}>
                     Mot de passe
                   </label>
-                  <a href="/reset-password" className="text-xs transition-colors" style={{ color: 'var(--primary)' }}>
+                  <a href="/reset-password?force=true" className="text-xs transition-colors" style={{ color: 'var(--primary)' }}>
                     Mot de passe oublié ?
                   </a>
                 </div>
@@ -148,7 +154,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 />
               </div>
 
-              {/* Submit button */}
               <Button
                 type="submit"
                 disabled={loading}
@@ -165,9 +170,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
               <p className="text-center text-sm font-light mt-4" style={{ color: 'var(--muted-foreground)' }}>
                 Pas encore de compte ?{" "}
-                <a href="/register" className="font-medium" style={{ color: 'var(--primary)' }}>
-                  Inscription
-                </a>
+                <a href="/register?force=true" className="font-medium" style={{ color: 'var(--primary)' }}>
+  Inscription
+</a>
               </p>
             </FieldGroup>
           </form>

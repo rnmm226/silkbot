@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -8,16 +9,21 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  name          String    @db.Text
+  id            String    @id @default(cuid())
+  name          String
   email         String    @unique
   emailVerified Boolean   @default(false)
-  image         String?   @db.Text
+  image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
   chats         Chat[]
   sessions      Session[]
+
+  role       String?
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
 
   @@map("user")
 }
@@ -28,10 +34,12 @@ model Session {
   token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  ipAddress String?  @db.Text
-  userAgent String?  @db.Text
+  ipAddress String?
+  userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  impersonatedBy String?
 
   @@index([userId])
   @@map("session")
@@ -39,16 +47,16 @@ model Session {
 
 model Account {
   id                    String    @id
-  accountId             String    @db.Text
-  providerId            String    @db.Text
+  accountId             String
+  providerId            String
   userId                String
-  accessToken           String?   @db.Text
-  refreshToken          String?   @db.Text
-  idToken               String?   @db.Text
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
-  scope                 String?   @db.Text
-  password              String?   @db.Text
+  scope                 String?
+  password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -59,8 +67,8 @@ model Account {
 
 model Verification {
   id         String   @id
-  identifier String   @db.Text
-  value      String   @db.Text
+  identifier String
+  value      String
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -71,7 +79,7 @@ model Verification {
 
 model Chat {
   id             String    @id @default(cuid())
-  title          String?   @db.Text
+  title          String?
   activeStreamId String?   @map("active_stream_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -87,7 +95,7 @@ model Message {
   id        String   @id @default(cuid())
   chatId    String   @map("chat_id")
   role      String
-  content   String   @db.Text
+  content   String
   parts     Json
   createdAt DateTime @default(now()) @map("created_at")
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
@@ -98,20 +106,20 @@ model Message {
 
 model SourceDocument {
   id        String                  @id @default(cuid())
-  content   String?                 @db.Text
-  segments  SourceDocumentSegment[]
+  content   String?
   createdAt DateTime                @default(now()) @map("created_at")
+  segments  SourceDocumentSegment[]
 }
 
 model SourceDocumentSegment {
-  id               String   @id @default(cuid())
+  id               String                 @id @default(cuid())
   content          String
   sourceDocumentid String?
-  vector           Unsupported("vector")?  // ← Utiliser Unsupported
-  createdAt        DateTime @default(now())
+  vector           Unsupported("vector")?
+  article_number   Int
   chunk_index      Int
+  createdAt        DateTime               @default(now())
   page_number      Int
   tags             String[]
-  article_number   Int
-  sourceDocument   SourceDocument? @relation(fields: [sourceDocumentid], references: [id])
+  sourceDocument   SourceDocument?        @relation(fields: [sourceDocumentid], references: [id])
 }

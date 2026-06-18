@@ -218,7 +218,7 @@ function ForgotPasswordContent() {
               )}
             </Button>
             
-            <Link href="/login">
+            <Link href="/login?force=true">
               <Button variant="outline" className="w-full">
                 Retour à la connexion
               </Button>
@@ -286,7 +286,7 @@ function ForgotPasswordContent() {
 
         <div className="text-center">
           <Link 
-            href="/login" 
+            href="/login?force=true" 
             className="text-sm transition-colors hover:underline underline-offset-4 text-primary hover:text-primary/80"
           >
             Retour à la connexion

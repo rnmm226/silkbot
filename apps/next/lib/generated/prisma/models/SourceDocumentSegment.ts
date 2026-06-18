@@ -20,52 +20,98 @@ export type SourceDocumentSegmentModel = runtime.Types.Result.DefaultSelection<P
 
 export type AggregateSourceDocumentSegment = {
   _count: SourceDocumentSegmentCountAggregateOutputType | null
+  _avg: SourceDocumentSegmentAvgAggregateOutputType | null
+  _sum: SourceDocumentSegmentSumAggregateOutputType | null
   _min: SourceDocumentSegmentMinAggregateOutputType | null
   _max: SourceDocumentSegmentMaxAggregateOutputType | null
+}
+
+export type SourceDocumentSegmentAvgAggregateOutputType = {
+  article_number: number | null
+  chunk_index: number | null
+  page_number: number | null
+}
+
+export type SourceDocumentSegmentSumAggregateOutputType = {
+  article_number: number | null
+  chunk_index: number | null
+  page_number: number | null
 }
 
 export type SourceDocumentSegmentMinAggregateOutputType = {
   id: string | null
   content: string | null
   sourceDocumentid: string | null
+  article_number: number | null
+  chunk_index: number | null
   createdAt: Date | null
+  page_number: number | null
 }
 
 export type SourceDocumentSegmentMaxAggregateOutputType = {
   id: string | null
   content: string | null
   sourceDocumentid: string | null
+  article_number: number | null
+  chunk_index: number | null
   createdAt: Date | null
+  page_number: number | null
 }
 
 export type SourceDocumentSegmentCountAggregateOutputType = {
   id: number
   content: number
   sourceDocumentid: number
+  article_number: number
+  chunk_index: number
   createdAt: number
+  page_number: number
+  tags: number
   _all: number
 }
 
+
+export type SourceDocumentSegmentAvgAggregateInputType = {
+  article_number?: true
+  chunk_index?: true
+  page_number?: true
+}
+
+export type SourceDocumentSegmentSumAggregateInputType = {
+  article_number?: true
+  chunk_index?: true
+  page_number?: true
+}
 
 export type SourceDocumentSegmentMinAggregateInputType = {
   id?: true
   content?: true
   sourceDocumentid?: true
+  article_number?: true
+  chunk_index?: true
   createdAt?: true
+  page_number?: true
 }
 
 export type SourceDocumentSegmentMaxAggregateInputType = {
   id?: true
   content?: true
   sourceDocumentid?: true
+  article_number?: true
+  chunk_index?: true
   createdAt?: true
+  page_number?: true
 }
 
 export type SourceDocumentSegmentCountAggregateInputType = {
   id?: true
   content?: true
   sourceDocumentid?: true
+  article_number?: true
+  chunk_index?: true
   createdAt?: true
+  page_number?: true
+  tags?: true
   _all?: true
 }
 
@@ -107,6 +153,18 @@ export type SourceDocumentSegmentAggregateArgs<ExtArgs extends runtime.Types.Ext
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: SourceDocumentSegmentAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: SourceDocumentSegmentSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: SourceDocumentSegmentMinAggregateInputType
@@ -137,6 +195,8 @@ export type SourceDocumentSegmentGroupByArgs<ExtArgs extends runtime.Types.Exten
   take?: number
   skip?: number
   _count?: SourceDocumentSegmentCountAggregateInputType | true
+  _avg?: SourceDocumentSegmentAvgAggregateInputType
+  _sum?: SourceDocumentSegmentSumAggregateInputType
   _min?: SourceDocumentSegmentMinAggregateInputType
   _max?: SourceDocumentSegmentMaxAggregateInputType
 }
@@ -145,8 +205,14 @@ export type SourceDocumentSegmentGroupByOutputType = {
   id: string
   content: string
   sourceDocumentid: string | null
+  article_number: number
+  chunk_index: number
   createdAt: Date
+  page_number: number
+  tags: string[]
   _count: SourceDocumentSegmentCountAggregateOutputType | null
+  _avg: SourceDocumentSegmentAvgAggregateOutputType | null
+  _sum: SourceDocumentSegmentSumAggregateOutputType | null
   _min: SourceDocumentSegmentMinAggregateOutputType | null
   _max: SourceDocumentSegmentMaxAggregateOutputType | null
 }
@@ -173,7 +239,11 @@ export type SourceDocumentSegmentWhereInput = {
   id?: Prisma.StringFilter<"SourceDocumentSegment"> | string
   content?: Prisma.StringFilter<"SourceDocumentSegment"> | string
   sourceDocumentid?: Prisma.StringNullableFilter<"SourceDocumentSegment"> | string | null
+  article_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  chunk_index?: Prisma.IntFilter<"SourceDocumentSegment"> | number
   createdAt?: Prisma.DateTimeFilter<"SourceDocumentSegment"> | Date | string
+  page_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  tags?: Prisma.StringNullableListFilter<"SourceDocumentSegment">
   sourceDocument?: Prisma.XOR<Prisma.SourceDocumentNullableScalarRelationFilter, Prisma.SourceDocumentWhereInput> | null
 }
 
@@ -181,7 +251,11 @@ export type SourceDocumentSegmentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   sourceDocumentid?: Prisma.SortOrderInput | Prisma.SortOrder
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
   sourceDocument?: Prisma.SourceDocumentOrderByWithRelationInput
 }
 
@@ -192,7 +266,11 @@ export type SourceDocumentSegmentWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.SourceDocumentSegmentWhereInput | Prisma.SourceDocumentSegmentWhereInput[]
   content?: Prisma.StringFilter<"SourceDocumentSegment"> | string
   sourceDocumentid?: Prisma.StringNullableFilter<"SourceDocumentSegment"> | string | null
+  article_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  chunk_index?: Prisma.IntFilter<"SourceDocumentSegment"> | number
   createdAt?: Prisma.DateTimeFilter<"SourceDocumentSegment"> | Date | string
+  page_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  tags?: Prisma.StringNullableListFilter<"SourceDocumentSegment">
   sourceDocument?: Prisma.XOR<Prisma.SourceDocumentNullableScalarRelationFilter, Prisma.SourceDocumentWhereInput> | null
 }, "id">
 
@@ -200,10 +278,16 @@ export type SourceDocumentSegmentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   sourceDocumentid?: Prisma.SortOrderInput | Prisma.SortOrder
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
   _count?: Prisma.SourceDocumentSegmentCountOrderByAggregateInput
+  _avg?: Prisma.SourceDocumentSegmentAvgOrderByAggregateInput
   _max?: Prisma.SourceDocumentSegmentMaxOrderByAggregateInput
   _min?: Prisma.SourceDocumentSegmentMinOrderByAggregateInput
+  _sum?: Prisma.SourceDocumentSegmentSumOrderByAggregateInput
 }
 
 export type SourceDocumentSegmentScalarWhereWithAggregatesInput = {
@@ -213,13 +297,21 @@ export type SourceDocumentSegmentScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"SourceDocumentSegment"> | string
   content?: Prisma.StringWithAggregatesFilter<"SourceDocumentSegment"> | string
   sourceDocumentid?: Prisma.StringNullableWithAggregatesFilter<"SourceDocumentSegment"> | string | null
+  article_number?: Prisma.IntWithAggregatesFilter<"SourceDocumentSegment"> | number
+  chunk_index?: Prisma.IntWithAggregatesFilter<"SourceDocumentSegment"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"SourceDocumentSegment"> | Date | string
+  page_number?: Prisma.IntWithAggregatesFilter<"SourceDocumentSegment"> | number
+  tags?: Prisma.StringNullableListFilter<"SourceDocumentSegment">
 }
 
 export type SourceDocumentSegmentCreateInput = {
   id?: string
   content: string
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
   sourceDocument?: Prisma.SourceDocumentCreateNestedOneWithoutSegmentsInput
 }
 
@@ -227,13 +319,21 @@ export type SourceDocumentSegmentUncheckedCreateInput = {
   id?: string
   content: string
   sourceDocumentid?: string | null
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
   sourceDocument?: Prisma.SourceDocumentUpdateOneWithoutSegmentsNestedInput
 }
 
@@ -241,27 +341,43 @@ export type SourceDocumentSegmentUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
   sourceDocumentid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentCreateManyInput = {
   id?: string
   content: string
   sourceDocumentid?: string | null
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
   sourceDocumentid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentListRelationFilter = {
@@ -274,25 +390,55 @@ export type SourceDocumentSegmentOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type StringNullableListFilter<$PrismaModel = never> = {
+  equals?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
+  has?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
+  hasEvery?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  hasSome?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  isEmpty?: boolean
+}
+
 export type SourceDocumentSegmentCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   sourceDocumentid?: Prisma.SortOrder
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
+  tags?: Prisma.SortOrder
+}
+
+export type SourceDocumentSegmentAvgOrderByAggregateInput = {
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
 }
 
 export type SourceDocumentSegmentMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   sourceDocumentid?: Prisma.SortOrder
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
 }
 
 export type SourceDocumentSegmentMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
   sourceDocumentid?: Prisma.SortOrder
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
+}
+
+export type SourceDocumentSegmentSumOrderByAggregateInput = {
+  article_number?: Prisma.SortOrder
+  chunk_index?: Prisma.SortOrder
+  page_number?: Prisma.SortOrder
 }
 
 export type SourceDocumentSegmentCreateNestedManyWithoutSourceDocumentInput = {
@@ -337,16 +483,41 @@ export type SourceDocumentSegmentUncheckedUpdateManyWithoutSourceDocumentNestedI
   deleteMany?: Prisma.SourceDocumentSegmentScalarWhereInput | Prisma.SourceDocumentSegmentScalarWhereInput[]
 }
 
+export type SourceDocumentSegmentCreatetagsInput = {
+  set: string[]
+}
+
+export type IntFieldUpdateOperationsInput = {
+  set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type SourceDocumentSegmentUpdatetagsInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
 export type SourceDocumentSegmentCreateWithoutSourceDocumentInput = {
   id?: string
   content: string
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUncheckedCreateWithoutSourceDocumentInput = {
   id?: string
   content: string
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentCreateOrConnectWithoutSourceDocumentInput = {
@@ -382,31 +553,51 @@ export type SourceDocumentSegmentScalarWhereInput = {
   id?: Prisma.StringFilter<"SourceDocumentSegment"> | string
   content?: Prisma.StringFilter<"SourceDocumentSegment"> | string
   sourceDocumentid?: Prisma.StringNullableFilter<"SourceDocumentSegment"> | string | null
+  article_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  chunk_index?: Prisma.IntFilter<"SourceDocumentSegment"> | number
   createdAt?: Prisma.DateTimeFilter<"SourceDocumentSegment"> | Date | string
+  page_number?: Prisma.IntFilter<"SourceDocumentSegment"> | number
+  tags?: Prisma.StringNullableListFilter<"SourceDocumentSegment">
 }
 
 export type SourceDocumentSegmentCreateManySourceDocumentInput = {
   id?: string
   content: string
+  article_number: number
+  chunk_index: number
   createdAt?: Date | string
+  page_number: number
+  tags?: Prisma.SourceDocumentSegmentCreatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUpdateWithoutSourceDocumentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUncheckedUpdateWithoutSourceDocumentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 export type SourceDocumentSegmentUncheckedUpdateManyWithoutSourceDocumentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  article_number?: Prisma.IntFieldUpdateOperationsInput | number
+  chunk_index?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  page_number?: Prisma.IntFieldUpdateOperationsInput | number
+  tags?: Prisma.SourceDocumentSegmentUpdatetagsInput | string[]
 }
 
 
@@ -415,7 +606,11 @@ export type SourceDocumentSegmentSelect<ExtArgs extends runtime.Types.Extensions
   id?: boolean
   content?: boolean
   sourceDocumentid?: boolean
+  article_number?: boolean
+  chunk_index?: boolean
   createdAt?: boolean
+  page_number?: boolean
+  tags?: boolean
   sourceDocument?: boolean | Prisma.SourceDocumentSegment$sourceDocumentArgs<ExtArgs>
 }, ExtArgs["result"]["sourceDocumentSegment"]>
 
@@ -423,7 +618,11 @@ export type SourceDocumentSegmentSelectCreateManyAndReturn<ExtArgs extends runti
   id?: boolean
   content?: boolean
   sourceDocumentid?: boolean
+  article_number?: boolean
+  chunk_index?: boolean
   createdAt?: boolean
+  page_number?: boolean
+  tags?: boolean
   sourceDocument?: boolean | Prisma.SourceDocumentSegment$sourceDocumentArgs<ExtArgs>
 }, ExtArgs["result"]["sourceDocumentSegment"]>
 
@@ -431,7 +630,11 @@ export type SourceDocumentSegmentSelectUpdateManyAndReturn<ExtArgs extends runti
   id?: boolean
   content?: boolean
   sourceDocumentid?: boolean
+  article_number?: boolean
+  chunk_index?: boolean
   createdAt?: boolean
+  page_number?: boolean
+  tags?: boolean
   sourceDocument?: boolean | Prisma.SourceDocumentSegment$sourceDocumentArgs<ExtArgs>
 }, ExtArgs["result"]["sourceDocumentSegment"]>
 
@@ -439,10 +642,14 @@ export type SourceDocumentSegmentSelectScalar = {
   id?: boolean
   content?: boolean
   sourceDocumentid?: boolean
+  article_number?: boolean
+  chunk_index?: boolean
   createdAt?: boolean
+  page_number?: boolean
+  tags?: boolean
 }
 
-export type SourceDocumentSegmentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "sourceDocumentid" | "createdAt", ExtArgs["result"]["sourceDocumentSegment"]>
+export type SourceDocumentSegmentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "sourceDocumentid" | "article_number" | "chunk_index" | "createdAt" | "page_number" | "tags", ExtArgs["result"]["sourceDocumentSegment"]>
 export type SourceDocumentSegmentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sourceDocument?: boolean | Prisma.SourceDocumentSegment$sourceDocumentArgs<ExtArgs>
 }
@@ -462,7 +669,11 @@ export type $SourceDocumentSegmentPayload<ExtArgs extends runtime.Types.Extensio
     id: string
     content: string
     sourceDocumentid: string | null
+    article_number: number
+    chunk_index: number
     createdAt: Date
+    page_number: number
+    tags: string[]
   }, ExtArgs["result"]["sourceDocumentSegment"]>
   composites: {}
 }
@@ -890,7 +1101,11 @@ export interface SourceDocumentSegmentFieldRefs {
   readonly id: Prisma.FieldRef<"SourceDocumentSegment", 'String'>
   readonly content: Prisma.FieldRef<"SourceDocumentSegment", 'String'>
   readonly sourceDocumentid: Prisma.FieldRef<"SourceDocumentSegment", 'String'>
+  readonly article_number: Prisma.FieldRef<"SourceDocumentSegment", 'Int'>
+  readonly chunk_index: Prisma.FieldRef<"SourceDocumentSegment", 'Int'>
   readonly createdAt: Prisma.FieldRef<"SourceDocumentSegment", 'DateTime'>
+  readonly page_number: Prisma.FieldRef<"SourceDocumentSegment", 'Int'>
+  readonly tags: Prisma.FieldRef<"SourceDocumentSegment", 'String[]'>
 }
     
 

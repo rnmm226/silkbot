@@ -156,7 +156,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
                 </Button>
                 <FieldDescription className="text-center text-sm font-light mt-4" style={{ color: 'var(--muted-foreground)' }}>
                   Déjà un compte ?{" "}
-                  <Link href="/login" className="font-medium" style={{ color: 'var(--primary)' }}>
+                  <Link href="/login?force=true" className="font-medium" style={{ color: 'var(--primary)' }}>
                     Connexion
                   </Link>
                 </FieldDescription>
