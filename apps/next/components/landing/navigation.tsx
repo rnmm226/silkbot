@@ -125,7 +125,7 @@ export function Navigation() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              href="/login?force=true"
+              href="/login"
               ref={magnetRef}
               onMouseMove={e => applyMagnet(e, magnetRef as React.RefObject<HTMLAnchorElement>)}
               onMouseLeave={() => resetMagnet(magnetRef as React.RefObject<HTMLAnchorElement>)}
@@ -142,7 +142,7 @@ export function Navigation() {
             </Link>
 
             <Link
-              href="/register?force=true"
+              href="/register"
               className={`rounded-full transition-all duration-500 active:scale-95 ${
                 isScrolled ? "px-4 h-8 text-xs" : "px-6 py-2.5 text-sm"
               } font-medium inline-flex items-center justify-center`}
@@ -219,7 +219,7 @@ export function Navigation() {
             transitionDelay: isMobileMenuOpen ? "300ms" : "0ms",
           }}>
             <Link
-              href="/login?force=true"
+              href="/login"
               onClick={handleLinkClick}
               className="text-center text-sm font-medium px-4 py-3 rounded-xl transition-all"
               style={{
@@ -239,7 +239,7 @@ export function Navigation() {
             </Link>
 
             <Link
-              href="/register?force=true"
+              href="/register"
               onClick={handleLinkClick}
               className="text-center text-sm font-medium px-4 py-3 rounded-xl transition-all active:scale-95"
               style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
