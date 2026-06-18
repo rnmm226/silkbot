@@ -56,7 +56,43 @@
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
+@keyframes sparkle {
+  to {
+    width: calc(var(--width) * 0.5px);
+    transform: translate(2000%, -50%);
+  }
+}
 
+.animate-sparkle {
+  animation: sparkle var(--duration, 10s) linear var(--delay, 0s) infinite;
+}
+
+/* Variante pour l'état checked */
+.toggle-sparkle-checked .animate-sparkle {
+  z-index: -10;
+  width: calc(var(--width) * 1.5px);
+  background-color: #acacac;
+  animation: sparkle-checked calc(100s / var(--duration)) linear
+    calc(10s / var(--duration)) infinite;
+}
+
+@keyframes sparkle-checked {
+  to {
+    width: calc(var(--width) * 1px);
+    transform: translate(5000%, -50%);
+  }
+}
+@keyframes move {
+  0% {
+    transform: translateX(-50%) translateY(0em);
+  }
+  50% {
+    transform: translateX(-50%) translateY(12em);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0em);
+  }
+}
 .dark {
   --background: oklch(0.2178 0 0);
   --foreground: oklch(0.8853 0 0);

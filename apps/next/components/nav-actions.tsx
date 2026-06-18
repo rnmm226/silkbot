@@ -39,7 +39,7 @@ type ActionItem = {
 };
 
 const adminActions = [
-  { label: "Administration", icon: ShieldCheckIcon, href: "/admin/vue_ensemble" },
+  { label: "Administration", icon: ShieldCheckIcon, href: "/admin" },
   { label: "Gestion des utilisateurs", icon: UsersIcon, href: "/admin/users" },
   { label: "Base documentaire", icon: DatabaseIcon, href: "/admin/documents" },
 ];

@@ -16,6 +16,7 @@ import { generateId } from 'ai';
 import type { UIMessage } from 'ai';
 import { Send, Pencil, X, ChevronDown, ChevronUp, FileText, Scale, Sparkles } from 'lucide-react';
 import { PDFViewer } from "@/components/PDFViewer";
+import { LoaderSparkle } from "@/components/ui/loader-sparkle";
 import ReactMarkdown from 'react-markdown';
 import Image from "next/image";
 
@@ -725,18 +726,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                       border: '1px solid var(--border)',
                     }}
                   >
-                    <div className="flex gap-1">
-                      {[0, 180, 360].map(delay => (
-                        <span
-                          key={delay}
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{
-                            background: 'var(--primary)',
-                            animation: `dotBounce 1.4s ease-in-out ${delay}ms infinite`,
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <LoaderSparkle />
                     <span
                       className="text-xs font-light"
                       style={{ color: 'var(--muted-foreground)' }}

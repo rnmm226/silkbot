@@ -168,7 +168,15 @@ export default function AdminDocumentsPage() {
 
   useEffect(() => { setCurrentPage(1); }, [query, filter]);
 
-  const loadSegments = async (doc: DocumentItem) => {
+  // Fonction pour fermer le panneau des segments
+  const closeSegments = useCallback(() => {
+    setSelectedDocument(null);
+    setSegments([]);
+    setSegmentError(null);
+  }, []);
+
+  // Fonction pour ouvrir les segments d'un document
+  const openSegments = useCallback(async (doc: DocumentItem) => {
     setSelectedDocument(doc);
     setSegments([]);
     setSegmentsLoading(true);
@@ -195,7 +203,7 @@ export default function AdminDocumentsPage() {
     } finally {
       setSegmentsLoading(false);
     }
-  };
+  }, []);
 
   const deleteDocument = async (doc: DocumentItem) => {
     if (!confirm(`Supprimer "${doc.filename}" et ses ${doc.segmentCount} segments ?`)) return;
@@ -210,9 +218,7 @@ export default function AdminDocumentsPage() {
       if (!res.ok) throw new Error(data.error ?? "Suppression impossible");
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
       if (selectedDocument?.id === doc.id) {
-        setSelectedDocument(null);
-        setSegments([]);
-        setSegmentError(null);
+        closeSegments();
       }
       showNotice("Document supprimé", "success");
     } catch (err) {
@@ -280,7 +286,10 @@ export default function AdminDocumentsPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Colonne principale */}
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+        <div className={cn(
+          "flex flex-1 flex-col gap-5 overflow-y-auto p-6 transition-all duration-300",
+          selectedDocument ? "xl:pr-2" : ""
+        )}>
           {/* Liste des documents */}
           <Card>
             <CardHeader>
@@ -351,11 +360,12 @@ export default function AdminDocumentsPage() {
                         className={cn(
                           "grid gap-2 px-3 py-2.5 transition-colors hover:bg-muted/20 md:grid-cols-[1fr_80px_70px_90px_36px] md:items-center",
                           idx !== paginatedDocuments.length - 1 && "border-b",
+                          selectedDocument?.id === doc.id && "bg-primary/5"
                         )}
                       >
                         <button
                           type="button"
-                          onClick={() => void loadSegments(doc)}
+                          onClick={() => void openSegments(doc)}
                           className="flex min-w-0 items-center gap-2.5 text-left"
                         >
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
@@ -391,7 +401,7 @@ export default function AdminDocumentsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => void loadSegments(doc)}>
+                            <DropdownMenuItem onClick={() => void openSegments(doc)}>
                               <Eye className="size-4" /> Voir les segments
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => void copyId(doc.id)}>
@@ -445,43 +455,27 @@ export default function AdminDocumentsPage() {
           </Card>
         </div>
 
-        {/* Panneau aperçu segments */}
-        <aside className="hidden w-80 flex-shrink-0 border-l xl:flex xl:flex-col">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Aperçu des segments</p>
-              <p className="text-xs text-muted-foreground">
-                {selectedDocument
-                  ? `${segments.length} segment(s)`
-                  : "Sélectionnez un document"}
-              </p>
-            </div>
-            {selectedDocument && (
+        {/* Panneau aperçu segments (visible uniquement quand un document est sélectionné) */}
+        {selectedDocument && (
+          <aside className="w-80 flex-shrink-0 border-l animate-in slide-in-from-right duration-300 xl:flex xl:flex-col">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Aperçu des segments</p>
+                <p className="text-xs text-muted-foreground">
+                  {segments.length} segment(s)
+                </p>
+              </div>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => {
-                  setSelectedDocument(null);
-                  setSegments([]);
-                  setSegmentError(null);
-                }}
+                onClick={closeSegments}
                 aria-label="Fermer l'aperçu"
               >
                 <X className="size-4" />
               </Button>
-            )}
-          </div>
+            </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            {!selectedDocument ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                <Eye className="size-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">Aucun document sélectionné</p>
-                <p className="max-w-52 text-xs text-muted-foreground">
-                  Cliquez sur un document de la liste pour afficher ses segments.
-                </p>
-              </div>
-            ) : (
+            <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3">
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <p className="truncate text-sm font-medium">{selectedDocument.filename}</p>
@@ -522,9 +516,9 @@ export default function AdminDocumentsPage() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </aside>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type AccountItem = {
@@ -241,10 +240,10 @@ export default function AdminVerificationPage() {
                           <span className="truncate text-xs text-muted-foreground">
                             {acc.email}
                           </span>
-                          <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50 text-[10px]">
-                            <Clock className="size-3 mr-1" />
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-yellow-700 bg-yellow-50 border border-yellow-200">
+                            <Clock className="size-3" />
                             En attente
-                          </Badge>
+                          </span>
                         </span>
                       </span>
                     </div>
@@ -257,13 +256,16 @@ export default function AdminVerificationPage() {
                       size="sm"
                       className="w-full"
                       disabled={verifyingId === acc.id}
-                      onClick={() => void verifyAccount(acc)}
+                      onClick={() => verifyAccount(acc)}
                     >
                       {verifyingId === acc.id ? (
-                        <RefreshCw className="size-3.5 animate-spin" />
+                        <>
+                          <RefreshCw className="mr-2 size-3.5 animate-spin" />
+                          Vérification...
+                        </>
                       ) : (
                         <>
-                          <CheckCircle2 className="size-3.5" />
+                          <CheckCircle2 className="mr-2 size-3.5" />
                           Vérifier
                         </>
                       )}
