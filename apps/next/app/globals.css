@@ -207,3 +207,72 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================
+   NOUVEAU — Accessibilité : respecte la préférence système de
+   réduction des animations. Règle globale en !important pour
+   neutraliser aussi les animations posées en style inline.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   NOUVEAU — Effet "shine" au survol.
+   Utilisé sur le CTA principal du Hero et le bouton du plan
+   recommandé (Pricing). Ajouter className="btn-shine".
+   ============================================================ */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+.btn-shine:hover::before {
+  left: 125%;
+}
+
+/* ============================================================
+   NOUVEAU — Effet "shine" en boucle douce.
+   Utilisé sur la carte du plan tarifaire recommandé pour attirer
+   l'œil sans nécessiter de survol. Ajouter className="recommended-shine"
+   sur un élément en position relative + overflow hidden.
+   ============================================================ */
+@keyframes shineSweep {
+  0% { transform: translateX(-120%) skewX(-20deg); }
+  100% { transform: translateX(220%) skewX(-20deg); }
+}
+.recommended-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 100%;
+  z-index: -1;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    color-mix(in oklch, var(--primary, #c4956a) 30%, transparent),
+    transparent
+  );
+  animation: shineSweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}

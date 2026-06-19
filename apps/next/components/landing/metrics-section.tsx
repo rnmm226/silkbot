@@ -45,7 +45,88 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
   );
 }
 
-const metrics = [
+// NOUVEAU: anneau de progression animé — donne une lecture immédiate et visuelle
+// des métriques exprimées en pourcentage (précision, fraîcheur des données).
+function DonutChart({ percentage, size = 84, strokeWidth = 7 }: { percentage: number; size?: number; strokeWidth?: number }) {
+  const [animated, setAnimated] = useState(0);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          let start: number | null = null;
+          const duration = 1400;
+
+          const step = (timestamp: number) => {
+            if (start === null) start = timestamp;
+            const progress = Math.min((timestamp - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setAnimated(eased * percentage);
+            if (progress < 1) requestAnimationFrame(step);
+          };
+
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.4 }
+    );
+
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [percentage, hasAnimated]);
+
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (animated / 100) * circumference;
+
+  return (
+    <div ref={ref} className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--color-border,#2a2520)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--primary,#c4956a)"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: 'stroke-dashoffset 0.1s linear' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center font-serif text-sm font-bold"
+        style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+        {animated.toFixed(1)}%
+      </div>
+    </div>
+  );
+}
+
+// NOUVEAU: type explicite pour autoriser un champ "donutValue" optionnel
+type Metric = {
+  value: number;
+  suffix: string;
+  prefix: string;
+  label: string;
+  description: string;
+  icon: string;
+  donutValue?: number;
+};
+
+const metrics: Metric[] = [
   { 
     value: 247, 
     suffix: "+", 
@@ -60,7 +141,8 @@ const metrics = [
     prefix: "",
     label: "Précision des réponses",
     description: "Sources vérifiables et référencées",
-    icon: "🎯"
+    icon: "🎯",
+    donutValue: 99.9, // NOUVEAU: affiché en anneau de progression plutôt qu'en simple compteur
   },
   { 
     value: 3, 
@@ -92,7 +174,8 @@ const metrics = [
     prefix: "",
     label: "Textes à jour",
     description: "Synchronisation JORT quotidienne",
-    icon: "🔄"
+    icon: "🔄",
+    donutValue: 100, // NOUVEAU
   },
 ];
 
@@ -192,17 +275,35 @@ export function MetricsSection() {
                   #{index + 1}
                 </span>
               </div>
-              <AnimatedCounter 
-                end={metric.value} 
-                suffix={metric.suffix} 
-                prefix={metric.prefix}
-              />
-              <div className="mt-3 text-base font-medium" style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
-                {metric.label}
-              </div>
-              <div className="mt-1 text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
-                {metric.description}
-              </div>
+
+              {metric.donutValue !== undefined ? (
+                // NOUVEAU: rendu en anneau de progression pour les métriques en %
+                <div className="flex items-center gap-4">
+                  <DonutChart percentage={metric.donutValue} />
+                  <div>
+                    <div className="text-base font-medium" style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+                      {metric.label}
+                    </div>
+                    <div className="mt-1 text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                      {metric.description}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <AnimatedCounter 
+                    end={metric.value} 
+                    suffix={metric.suffix} 
+                    prefix={metric.prefix}
+                  />
+                  <div className="mt-3 text-base font-medium" style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+                    {metric.label}
+                  </div>
+                  <div className="mt-1 text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                    {metric.description}
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>

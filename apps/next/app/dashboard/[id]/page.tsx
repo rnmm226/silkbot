@@ -14,9 +14,8 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { generateId } from 'ai';
 import type { UIMessage } from 'ai';
-import { Send, Pencil, X, ChevronDown, ChevronUp, FileText, Scale, Sparkles } from 'lucide-react';
+import { Send, Pencil, X, ChevronDown, ChevronUp, FileText, Scale, Sparkles, Copy, Check, Loader2 } from 'lucide-react';
 import { PDFViewer } from "@/components/PDFViewer";
-import { LoaderSparkle } from "@/components/ui/loader-sparkle";
 import ReactMarkdown from 'react-markdown';
 import Image from "next/image";
 
@@ -86,6 +85,57 @@ function convertUIMessages(msgs: UIMessage[]): ChatMessage[] {
       structured,
     };
   });
+}
+
+// ─────────────────────────────────────────────
+// MessageActions - Copier/Modifier un message
+// ─────────────────────────────────────────────
+
+function MessageActions({ 
+  text, 
+  onEdit, 
+  isUser 
+}: { 
+  text: string; 
+  onEdit?: () => void;
+  isUser?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Erreur lors de la copie:', err);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button
+        onClick={copyToClipboard}
+        className="p-1 rounded-md hover:bg-accent transition-colors"
+        title="Copier le message"
+      >
+        {copied ? (
+          <Check className="w-3.5 h-3.5 text-green-500" />
+        ) : (
+          <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+      </button>
+      {isUser && onEdit && (
+        <button
+          onClick={onEdit}
+          className="p-1 rounded-md hover:bg-accent transition-colors"
+          title="Modifier le message"
+        >
+          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -301,9 +351,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [titleInput, setTitleInput] = useState('');
   const [selectedSource, setSelectedSource] = useState<UsedSource | null>(null);
   const [logoError, setLogoError] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editInput, setEditInput] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const chatId = id ?? useMemo(() => generateId(), []);
 
   const LOADING_STEPS = ["Recherche dans les documents…", "Analyse des passages…", "Rédaction de la réponse…"];
@@ -341,6 +394,12 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
     if (!isPending && (!data || error)) router.replace("/login");
   }, [data, error, isPending, router]);
 
+  useEffect(() => {
+    if (editingMessageId && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+    }
+  }, [editingMessageId]);
+
   const handleTitleSave = async () => {
     if (!titleInput.trim()) { setIsEditingTitle(false); return; }
     setChatTitle(titleInput);
@@ -351,6 +410,81 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       body: JSON.stringify({ title: titleInput }),
     });
     window.dispatchEvent(new Event('chat-updated'));
+  };
+
+  const startEditMessage = (message: ChatMessage) => {
+    setEditingMessageId(message.id);
+    setEditInput(message.text);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditInput('');
+  };
+
+  const saveEditMessage = async (messageId: string) => {
+    if (!editInput.trim()) {
+      cancelEditMessage();
+      return;
+    }
+
+    // Update local state
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, text: editInput.trim() }
+        : msg
+    ));
+
+    // If it's a user message, we need to regenerate the assistant response
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex !== -1 && messages[messageIndex].role === 'user') {
+      // Remove all messages after this one (including the assistant response)
+      const updatedMessages = messages.slice(0, messageIndex + 1);
+      updatedMessages[messageIndex] = { 
+        ...updatedMessages[messageIndex], 
+        text: editInput.trim() 
+      };
+      setMessages(updatedMessages);
+
+      // Send the edited message to get a new response
+      setLoading(true);
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: chatId,
+            message: { 
+              id: updatedMessages[messageIndex].id, 
+              role: 'user', 
+              parts: [{ type: 'text', text: editInput.trim() }] 
+            },
+          }),
+        });
+
+        const resData = await res.json();
+        if (!res.ok) throw new Error(resData.error || `HTTP ${res.status}`);
+
+        const structured = resData as StructuredResponse;
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          text: structured.answer,
+          structured,
+        }]);
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          role: 'assistant',
+          text: `Erreur : ${(err as Error).message}`,
+        }]);
+      } finally {
+        setLoading(false);
+        cancelEditMessage();
+      }
+    } else {
+      cancelEditMessage();
+    }
   };
 
   const sendMessage = async () => {
@@ -390,6 +524,24 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       }]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    if (!confirm('Supprimer cette conversation ?')) return;
+    try {
+      await fetch(`/api/chat/${id}`, { method: 'DELETE' });
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Erreur lors de la suppression:', err);
+    }
+  };
+
+  const handleShareChat = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+    } catch (err) {
+      console.error('Erreur lors du partage:', err);
     }
   };
 
@@ -451,35 +603,33 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           <Separator orientation="vertical" className="h-4 opacity-20" />
 
           {/* Logo */}
-         
-            <div
-              className="flex size-6 items-center justify-center rounded-md overflow-hidden"
-              style={{ background: 'var(--primary)' }}
-            >
-              {logoError ? (
-                <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
-              ) : (
-                <Image
-                  src="/silkbot-logo-white.png"
-                  alt="SilkBot Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                  onError={() => setLogoError(true)}
-                />
-              )}
-            </div>
-            {!logoError && (
+          <div
+            className="flex size-6 items-center justify-center rounded-md overflow-hidden"
+            style={{ background: 'var(--primary)' }}
+          >
+            {logoError ? (
+              <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
+            ) : (
               <Image
-                src="/silkbot-black.png"
-                alt="SilkBot"
-                width={70}
-                height={22}
-                className="object-contain block dark:hidden"
+                src="/silkbot-logo-white.png"
+                alt="SilkBot Logo"
+                width={24}
+                height={24}
+                className="object-contain"
                 onError={() => setLogoError(true)}
               />
             )}
-        
+          </div>
+          {!logoError && (
+            <Image
+              src="/silkbot-black.png"
+              alt="SilkBot"
+              width={70}
+              height={22}
+              className="object-contain block dark:hidden"
+              onError={() => setLogoError(true)}
+            />
+          )}
 
           <Breadcrumb className="flex-1 min-w-0">
             <BreadcrumbList>
@@ -524,7 +674,16 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
               {data?.user?.name}
             </span>
             <AlertDialogWithMedia />
-            <NavActions />
+            <NavActions
+              chatTitle={chatTitle}
+              onRename={() => {
+                setTitleInput(chatTitle);
+                setIsEditingTitle(true);
+              }}
+              onShare={handleShareChat}
+              onExportPdf={() => window.print()}
+              onDelete={handleDeleteChat}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -626,71 +785,140 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
             {/* Messages list */}
             <div className="max-w-3xl mx-auto flex flex-col gap-6">
-              {messages.map((message, i) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  style={{
-                    opacity: 0,
-                    animation: `msgIn 0.35s cubic-bezier(0.22,1,0.36,1) ${i < 4 ? i * 50 : 0}ms both`,
-                  }}
-                >
-                  {/* Assistant avatar */}
-                  {message.role === 'assistant' && (
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1 overflow-hidden"
-                      style={{
-                        background: 'var(--secondary)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      {logoError ? (
-                        <Scale className="w-3.5 h-3.5" style={{ color: 'var(--primary)' }} />
+              {messages.map((message, i) => {
+                const isEditing = editingMessageId === message.id;
+                const isUser = message.role === 'user';
+
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex gap-3 group ${isUser ? 'justify-end' : 'justify-start'}`}
+                    style={{
+                      opacity: 0,
+                      animation: `msgIn 0.35s cubic-bezier(0.22,1,0.36,1) ${i < 4 ? i * 50 : 0}ms both`,
+                    }}
+                  >
+                    {/* Assistant avatar */}
+                    {!isUser && (
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1 overflow-hidden"
+                        style={{
+                          background: 'var(--secondary)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        {logoError ? (
+                          <Scale className="w-3.5 h-3.5" style={{ color: 'var(--primary)' }} />
+                        ) : (
+                          <Image
+                            src="/silkbot-logo-white.png"
+                            alt="SilkBot"
+                            width={24}
+                            height={24}
+                            className="object-contain"
+                            onError={() => setLogoError(true)}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Message content */}
+                    <div className="flex flex-col">
+                      {isEditing ? (
+                        <div
+                          className="flex flex-col gap-2"
+                          style={{
+                            maxWidth: '78%',
+                          }}
+                        >
+                          <textarea
+                            ref={editTextareaRef}
+                            value={editInput}
+                            onChange={e => setEditInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                saveEditMessage(message.id);
+                              }
+                              if (e.key === 'Escape') {
+                                cancelEditMessage();
+                              }
+                            }}
+                            className="rounded-lg px-4 py-3 text-sm resize-none focus:outline-none"
+                            style={{
+                              background: 'var(--card)',
+                              border: '1px solid var(--primary)',
+                              color: 'var(--foreground)',
+                              minWidth: '200px',
+                              minHeight: '60px',
+                            }}
+                            rows={3}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => saveEditMessage(message.id)}
+                              className="px-3 py-1 rounded-md text-xs font-medium"
+                              style={{
+                                background: 'var(--primary)',
+                                color: 'var(--primary-foreground)',
+                              }}
+                            >
+                              Enregistrer
+                            </button>
+                            <button
+                              onClick={cancelEditMessage}
+                              className="px-3 py-1 rounded-md text-xs font-medium"
+                              style={{
+                                background: 'var(--secondary)',
+                                color: 'var(--secondary-foreground)',
+                              }}
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                        </div>
+                      ) : isUser ? (
+                        <div
+                          className="max-w-[72%] rounded-lg rounded-tr-sm px-4 py-3 text-sm leading-relaxed"
+                          style={{
+                            background: 'var(--primary)',
+                            color: 'var(--primary-foreground)',
+                          }}
+                        >
+                          <p>{message.text}</p>
+                        </div>
                       ) : (
-                        <Image
-                          src="/silkbot-logo-white.png"
-                          alt="SilkBot"
-                          width={24}
-                          height={24}
-                          className="object-contain"
-                          onError={() => setLogoError(true)}
+                        <AssistantBubble msg={message} onSourceClick={setSelectedSource} />
+                      )}
+
+                      {/* Message actions - only show when not editing */}
+                      {!isEditing && (
+                        <MessageActions
+                          text={message.text}
+                          isUser={isUser}
+                          onEdit={isUser ? () => startEditMessage(message) : undefined}
                         />
                       )}
                     </div>
-                  )}
 
-                  {/* Bubble */}
-                  {message.role === 'user' ? (
-                    <div
-                      className="max-w-[72%] rounded-lg rounded-tr-sm px-4 py-3 text-sm leading-relaxed"
-                      style={{
-                        background: 'var(--primary)',
-                        color: 'var(--primary-foreground)',
-                      }}
-                    >
-                      <p>{message.text}</p>
-                    </div>
-                  ) : (
-                    <AssistantBubble msg={message} onSourceClick={setSelectedSource} />
-                  )}
+                    {/* User avatar */}
+                    {isUser && !isEditing && (
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1 text-[10px] font-semibold"
+                        style={{
+                          background: 'var(--secondary)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--muted-foreground)',
+                        }}
+                      >
+                        {initials}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
-                  {/* User avatar */}
-                  {message.role === 'user' && (
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-1 text-[10px] font-semibold"
-                      style={{
-                        background: 'var(--secondary)',
-                        border: '1px solid var(--border)',
-                        color: 'var(--muted-foreground)',
-                      }}
-                    >
-                      {initials}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Loading indicator */}
+              {/* Loading indicator - sans LoaderSparkle */}
               {loading && (
                 <div
                   className="flex gap-3 justify-start"
@@ -726,7 +954,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                       border: '1px solid var(--border)',
                     }}
                   >
-                    <LoaderSparkle />
+                    <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--primary)' }} />
                     <span
                       className="text-xs font-light"
                       style={{ color: 'var(--muted-foreground)' }}

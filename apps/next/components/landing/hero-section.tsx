@@ -13,6 +13,10 @@ export function HeroSection() {
   const [showResponse, setShowResponse] = useState(false);
   const magnetRef = useRef<HTMLAnchorElement>(null);
   const buttonMagnetRef = useRef<HTMLAnchorElement>(null);
+  // NOUVEAU: ref pour le tilt 3D au survol de la démo de chat
+  const tiltRef = useRef<HTMLDivElement>(null);
+  // NOUVEAU: compteur d'utilisateurs en ligne (preuve sociale, légère variation simulée)
+  const [onlineUsers, setOnlineUsers] = useState(312);
 
   useEffect(() => {
     setIsVisible(true);
@@ -36,6 +40,17 @@ export function HeroSection() {
     };
   }, [isVisible]);
 
+  // NOUVEAU: fait légèrement varier le nombre d'utilisateurs en ligne toutes les ~3s
+  useEffect(() => {
+    const id = setInterval(() => {
+      setOnlineUsers((prev) => {
+        const delta = Math.floor(Math.random() * 7) - 3; // -3 à +3
+        return Math.min(420, Math.max(280, prev + delta));
+      });
+    }, 3200);
+    return () => clearInterval(id);
+  }, []);
+
   // Effet magnet
   const applyMagnet = useCallback((e: React.MouseEvent<HTMLAnchorElement>, ref: React.RefObject<HTMLAnchorElement>) => {
     const el = ref.current;
@@ -48,6 +63,20 @@ export function HeroSection() {
 
   const resetMagnet = useCallback((ref: React.RefObject<HTMLAnchorElement>) => {
     if (ref.current) ref.current.style.transform = "";
+  }, []);
+
+  // NOUVEAU: tilt 3D — la carte de démo suit subtilement le curseur (parallax léger)
+  const handleTiltMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = tiltRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `rotateY(${px * 8}deg) rotateX(${-py * 8}deg)`;
+  }, []);
+
+  const handleTiltLeave = useCallback(() => {
+    if (tiltRef.current) tiltRef.current.style.transform = "rotateY(0deg) rotateX(0deg)";
   }, []);
 
   // Composant TypingText local
@@ -168,7 +197,7 @@ export function HeroSection() {
                 ref={magnetRef}
                 onMouseMove={e => applyMagnet(e, magnetRef)}
                 onMouseLeave={() => resetMagnet(magnetRef)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 hover:-translate-y-0.5"
+                className="btn-shine inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 hover:-translate-y-0.5"
                 style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
               >
                 Essayer gratuitement
@@ -201,6 +230,21 @@ export function HeroSection() {
                 <span key={i} className="text-xs font-light flex items-center gap-1.5" style={{ color: 'color-mix(in oklch, var(--color-muted-foreground,#8a7f72) 70%, transparent)' }}>{b}</span>
               ))}
             </div>
+
+            {/* NOUVEAU: compteur d'utilisateurs en ligne — preuve sociale discrète et vivante */}
+            <div 
+              className={`inline-flex items-center gap-2 mt-4 transition-all duration-700 delay-500 ${
+                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              }`}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: '#4ade80', animation: 'dotPulse 2s ease infinite' }} />
+                <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#4ade80' }} />
+              </span>
+              <span className="text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                <strong style={{ color: 'var(--color-foreground,#e8e0d0)', fontWeight: 600 }}>{onlineUsers}</strong> personnes en ligne actuellement
+              </span>
+            </div>
           </div>
 
           {/* Right: animated chat demo */}
@@ -209,104 +253,117 @@ export function HeroSection() {
               isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
             }`}
           >
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl"
+            {/* NOUVEAU: enveloppe de tilt 3D — suit la souris, indépendante de l'animation
+                de flottement (floatSlow) qui reste posée sur la carte elle-même */}
+            <div
+              ref={tiltRef}
+              onMouseMove={handleTiltMove}
+              onMouseLeave={handleTiltLeave}
               style={{
-                background: 'var(--color-card,#1a1815)',
-                border: '1px solid var(--color-border,#2a2520)',
-                animation: 'floatSlow 9s ease-in-out infinite',
-                boxShadow: '0 25px 80px color-mix(in oklch, var(--primary,#c4956a) 12%, rgba(0,0,0,0.5))',
-              }}>
+                perspective: '1200px',
+                transformStyle: 'preserve-3d',
+                transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+              }}
+            >
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl"
+                style={{
+                  background: 'var(--color-card,#1a1815)',
+                  border: '1px solid var(--color-border,#2a2520)',
+                  animation: 'floatSlow 9s ease-in-out infinite',
+                  boxShadow: '0 25px 80px color-mix(in oklch, var(--primary,#c4956a) 12%, rgba(0,0,0,0.5))',
+                }}>
 
-              {/* Window chrome */}
-              <div className="flex items-center gap-2.5 px-4 py-3.5" style={{ borderBottom: '1px solid var(--color-border,#2a2520)', background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)' }}>
-                <div className="flex gap-1.5">
-                  {['#ff5f57', '#ffbd2e', '#28c840'].map(c => <div key={c} className="w-2.5 h-2.5 rounded-full" style={{ background: c, opacity: 0.7 }} />)}
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-muted-foreground,#8a7f72)', opacity: 0.6 }}>silkbot.app/chat</span>
-                </div>
-              </div>
-
-              {/* Chat body */}
-              <div className="p-5 space-y-4 min-h-[280px]">
-                {/* User message */}
-                {chatVisible && (
-                  <div className="flex justify-end" style={{ animation: 'slideInRight 0.4s cubic-bezier(0.22,1,0.36,1) both' }}>
-                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-3 text-sm" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
-                      <TypingText text="Puis-je résilier mon bail avant terme ?" delay={100} />
-                    </div>
+                {/* Window chrome */}
+                <div className="flex items-center gap-2.5 px-4 py-3.5" style={{ borderBottom: '1px solid var(--color-border,#2a2520)', background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)' }}>
+                  <div className="flex gap-1.5">
+                    {['#ff5f57', '#ffbd2e', '#28c840'].map(c => <div key={c} className="w-2.5 h-2.5 rounded-full" style={{ background: c, opacity: 0.7 }} />)}
                   </div>
-                )}
+                  <div className="flex-1 flex items-center justify-center">
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-muted-foreground,#8a7f72)', opacity: 0.6 }}>silkbot.app/chat</span>
+                  </div>
+                </div>
 
-                {/* Assistant response */}
-                {showResponse && (
-                  <div className="flex gap-3" style={{ animation: 'fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both' }}>
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 12%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)' }}>
-                      <span style={{ fontSize: '12px' }}>⚖</span>
-                    </div>
-                    <div className="max-w-[82%]">
-                      <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 mb-2 text-xs"
-                        style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 8%, transparent)', color: 'color-mix(in oklch, var(--primary,#c4956a) 80%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 18%, transparent)' }}>
-                        ✦ <TypingText text="12 passages analysés · 3 retenus" delay={200} />
+                {/* Chat body */}
+                <div className="p-5 space-y-4 min-h-[280px]">
+                  {/* User message */}
+                  {chatVisible && (
+                    <div className="flex justify-end" style={{ animation: 'slideInRight 0.4s cubic-bezier(0.22,1,0.36,1) both' }}>
+                      <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-3 text-sm" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
+                        <TypingText text="Puis-je résilier mon bail avant terme ?" delay={100} />
                       </div>
-                      <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 text-sm leading-relaxed"
-                        style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)', border: '1px solid var(--color-border,#2a2520)', color: 'var(--color-foreground,#e8e0d0)' }}>
-                        <TypingText text="Selon l'art. 113 du C.O.C., vous pouvez résilier avant terme avec un préavis écrit d'un mois, sauf clause contraire dans le contrat." delay={400} />
-                        <div className="flex gap-1.5 mt-3 flex-wrap">
-                          {['C.O.C. art. 113', 'Loi 76-35 art. 8'].map(s => (
-                            <span key={s} className="text-xs px-2.5 py-1 rounded-full"
-                              style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)', color: 'var(--primary,#c4956a)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 22%, transparent)' }}>
-                              {s} ✓
-                            </span>
-                          ))}
+                    </div>
+                  )}
+
+                  {/* Assistant response */}
+                  {showResponse && (
+                    <div className="flex gap-3" style={{ animation: 'fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both' }}>
+                      <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 12%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)' }}>
+                        <span style={{ fontSize: '12px' }}>⚖</span>
+                      </div>
+                      <div className="max-w-[82%]">
+                        <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 mb-2 text-xs"
+                          style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 8%, transparent)', color: 'color-mix(in oklch, var(--primary,#c4956a) 80%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 18%, transparent)' }}>
+                          ✦ <TypingText text="12 passages analysés · 3 retenus" delay={200} />
+                        </div>
+                        <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 text-sm leading-relaxed"
+                          style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)', border: '1px solid var(--color-border,#2a2520)', color: 'var(--color-foreground,#e8e0d0)' }}>
+                          <TypingText text="Selon l'art. 113 du C.O.C., vous pouvez résilier avant terme avec un préavis écrit d'un mois, sauf clause contraire dans le contrat." delay={400} />
+                          <div className="flex gap-1.5 mt-3 flex-wrap">
+                            {['C.O.C. art. 113', 'Loi 76-35 art. 8'].map(s => (
+                              <span key={s} className="text-xs px-2.5 py-1 rounded-full"
+                                style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)', color: 'var(--primary,#c4956a)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 22%, transparent)' }}>
+                                {s} ✓
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Typing indicator */}
-                {chatVisible && !showResponse && (
-                  <div className="flex gap-3" style={{ animation: 'fadeUp 0.4s ease 0.3s both' }}>
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 12%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)' }}>
-                      <span style={{ fontSize: '12px' }}>⚖</span>
+                  {/* Typing indicator */}
+                  {chatVisible && !showResponse && (
+                    <div className="flex gap-3" style={{ animation: 'fadeUp 0.4s ease 0.3s both' }}>
+                      <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: 'color-mix(in oklch, var(--primary,#c4956a) 12%, transparent)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)' }}>
+                        <span style={{ fontSize: '12px' }}>⚖</span>
+                      </div>
+                      <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5"
+                        style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)', border: '1px solid var(--color-border,#2a2520)' }}>
+                        {[0, 160, 320].map(d => (
+                          <span key={d} className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: 'var(--primary,#c4956a)', animation: `dotPulse 1.4s ease ${d}ms infinite` }} />
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5"
-                      style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 60%, transparent)', border: '1px solid var(--color-border,#2a2520)' }}>
-                      {[0, 160, 320].map(d => (
-                        <span key={d} className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: 'var(--primary,#c4956a)', animation: `dotPulse 1.4s ease ${d}ms infinite` }} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Input bar */}
-              <div className="px-4 pb-4">
-                <div className="flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 70%, transparent)', border: '1px solid var(--color-border,#2a2520)' }}>
-                  <span className="text-xs flex-1 font-light" style={{ color: 'color-mix(in oklch, var(--color-muted-foreground,#8a7f72) 50%, transparent)' }}>Posez votre question juridique…</span>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary,#c4956a)' }}>
-                    <span style={{ fontSize: '10px', color: '#0f0e0c' }}>→</span>
+                {/* Input bar */}
+                <div className="px-4 pb-4">
+                  <div className="flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: 'color-mix(in oklch, var(--color-background,#0f0e0c) 70%, transparent)', border: '1px solid var(--color-border,#2a2520)' }}>
+                    <span className="text-xs flex-1 font-light" style={{ color: 'color-mix(in oklch, var(--color-muted-foreground,#8a7f72) 50%, transparent)' }}>Posez votre question juridique…</span>
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary,#c4956a)' }}>
+                      <span style={{ fontSize: '10px', color: '#0f0e0c' }}>→</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Floating accuracy badge */}
-            <div className="absolute -bottom-4 -left-5 rounded-2xl px-4 py-3 shadow-xl"
-              style={{ background: 'var(--color-card,#1a1815)', border: '1px solid var(--color-border,#2a2520)', animation: 'floatSlow 11s ease-in-out 1.5s infinite reverse' }}>
-              <div className="text-xs font-light mb-0.5" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>Précision des sources</div>
-              <div className="font-serif text-xl font-bold" style={{ color: 'var(--color-foreground,#e8e0d0)' }}>99.1<span style={{ fontSize: '14px', color: 'var(--primary,#c4956a)' }}>%</span></div>
-            </div>
+              {/* Floating accuracy badge */}
+              <div className="absolute -bottom-4 -left-5 rounded-2xl px-4 py-3 shadow-xl"
+                style={{ background: 'var(--color-card,#1a1815)', border: '1px solid var(--color-border,#2a2520)', animation: 'floatSlow 11s ease-in-out 1.5s infinite reverse' }}>
+                <div className="text-xs font-light mb-0.5" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>Précision des sources</div>
+                <div className="font-serif text-xl font-bold" style={{ color: 'var(--color-foreground,#e8e0d0)' }}>99.1<span style={{ fontSize: '14px', color: 'var(--primary,#c4956a)' }}>%</span></div>
+              </div>
 
-            {/* Floating doc count badge */}
-            <div className="absolute -top-3 -right-4 rounded-2xl px-3.5 py-2.5 shadow-xl"
-              style={{ background: 'var(--color-card,#1a1815)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)', animation: 'floatSlow 13s ease-in-out 3s infinite' }}>
-              <div className="text-xs font-medium" style={{ color: 'var(--primary,#c4956a)' }}>📚 1 247 textes</div>
-              <div className="text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>mis à jour</div>
+              {/* Floating doc count badge */}
+              <div className="absolute -top-3 -right-4 rounded-2xl px-3.5 py-2.5 shadow-xl"
+                style={{ background: 'var(--color-card,#1a1815)', border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 25%, transparent)', animation: 'floatSlow 13s ease-in-out 3s infinite' }}>
+                <div className="text-xs font-medium" style={{ color: 'var(--primary,#c4956a)' }}>📚 1 247 textes</div>
+                <div className="text-xs font-light" style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>mis à jour</div>
+              </div>
             </div>
           </div>
         </div>
