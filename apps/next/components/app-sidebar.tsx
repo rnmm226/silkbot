@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import * as React from "react"
 import { authClient } from "@/lib/auth-client"
+
 const data = {
   navMain: [
     {
@@ -61,19 +62,27 @@ const data = {
   ],
 }
 
+// ✅ Correction du composant AppSidebarHistory
 export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }) {
   const router = useRouter()
   const [chats, setChats] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-
-  const fetchChats = () => {
-    const url = searchQuery
-      ? `/api/chat?q=${encodeURIComponent(searchQuery)}`
-      : '/api/chat'
-    fetch(url)
-      .then(resp => resp.json())
-      .then(d => setChats(Array.isArray(d) ? d : []))
-      .catch(() => setChats([]))
+  const fetchChats = async () => {
+    setIsLoading(true)
+    try {
+      const url = searchQuery
+        ? `/api/chat?q=${encodeURIComponent(searchQuery)}`
+        : '/api/chat'
+      const resp = await fetch(url)
+      const data = await resp.json()
+      setChats(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Error fetching chats:', error)
+      setChats([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -82,11 +91,24 @@ export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }
     return () => window.removeEventListener('chat-updated', fetchChats)
   }, [searchQuery])
 
+  if (isLoading) {
+    return (
+      <div className="px-3 py-4 text-center">
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-4 h-4 border-2 border-sidebar-foreground/20 border-t-sidebar-foreground/60 rounded-full animate-spin" />
+          <p className="text-[11px] text-sidebar-foreground/30 font-light">
+            Chargement...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (!Array.isArray(chats) || chats.length === 0) {
     return (
       <div className="px-3 py-4 text-center">
         <p className="text-[11px] text-sidebar-foreground/30 font-light">
-          Aucune conversation
+          {searchQuery ? 'Aucun résultat' : 'Aucune conversation'}
         </p>
       </div>
     )
@@ -94,10 +116,10 @@ export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }
 
   return (
     <div className="space-y-0.5 px-2">
-      {chats.map((e) => (
+      {chats.map((chat) => (
         <button
-          key={e.id}
-          onClick={() => router.push(`/dashboard/${e.id}`)}
+          key={chat.id}
+          onClick={() => router.push(`/dashboard/${chat.id}`)}
           className="group w-full text-left px-3 py-2.5 rounded-lg transition-all duration-150
             hover:bg-sidebar-accent/60 text-sidebar-foreground/70 hover:text-sidebar-accent-foreground"
         >
@@ -105,11 +127,11 @@ export function AppSidebarHistory({ searchQuery = "" }: { searchQuery?: string }
             <MessageSquareIcon className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-40 group-hover:opacity-70 transition-opacity" />
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-sidebar-foreground/80 group-hover:text-sidebar-accent-foreground leading-tight">
-                {e.title}
+                {chat.title || 'Nouvelle conversation'}
               </div>
-              {e.lastMessage && (
+              {chat.lastMessage && (
                 <div className="truncate text-[11px] text-sidebar-foreground/40 font-light mt-0.5 leading-tight">
-                  {e.lastMessage}
+                  {chat.lastMessage}
                 </div>
               )}
             </div>
@@ -127,10 +149,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [logoError, setLogoError] = useState(false);
 
-  const handleNewChat = () => {
-    const newId = generateId()
-    router.push(`/dashboard/${newId}`)
-    setTimeout(() => window.dispatchEvent(new Event('chat-updated')), 500)
+  const handleNewChat = async () => {
+    try {
+      // Créer un nouveau chat via l'API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      
+      if (!response.ok) throw new Error('Failed to create chat')
+      
+      const data = await response.json()
+      router.push(`/dashboard/${data.id}`)
+      setTimeout(() => window.dispatchEvent(new Event('chat-updated')), 500)
+    } catch (error) {
+      console.error('Error creating new chat:', error)
+      // Fallback: utiliser generateId
+      const newId = generateId()
+      router.push(`/dashboard/${newId}`)
+      setTimeout(() => window.dispatchEvent(new Event('chat-updated')), 500)
+    }
   }
 
   const handleLogout = async () => {
@@ -169,47 +208,43 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 py-4">
-         <span> 
           <div>
-                      <Link href="/" className="flex items-center gap-2 mr-2">
-                        <div
-                          className="flex size-6 items-center justify-center rounded-md overflow-hidden"
-                          style={{ background: 'var(--primary)' }}
-                        >
-                          {logoError ? (
-                            <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
-                          ) : (
-                            <Image
-                              src="/silkbot-logo-white.png"
-                              alt="SilkBot Logo"
-                              width={24}
-                              height={24}
-                              className="object-contain"
-                              onError={() => setLogoError(true)}
-                            />
-                          )}
-                        </div>
-                        {!logoError && (
-                          <Image
-                            src="/silkbot-black.png"
-                            alt="SilkBot"
-                            width={70}
-                            height={22}
-                            className="object-contain block dark:hidden"
-                            onError={() => setLogoError(true)}
-                          />
-                        )}
-                      </Link>
+            <Link href="/" className="flex items-center gap-2 mr-2">
+              <div
+                className="flex size-6 items-center justify-center rounded-md overflow-hidden"
+                style={{ background: 'var(--primary)' }}
+              >
+                {logoError ? (
+                  <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
+                ) : (
+                  <Image
+                    src="/silkbot-logo-white.png"
+                    alt="SilkBot Logo"
+                    width={24}
+                    height={24}
+                    className="object-contain"
+                    onError={() => setLogoError(true)}
+                  />
+                )}
               </div>
-            </span>
-            <div>
-              <p className="text-[10px] text-sidebar-foreground/35 font-light leading-none mt-0.5">
+              {!logoError && (
+                <Image
+                  src="/silkbot-black.png"
+                  alt="SilkBot"
+                  width={70}
+                  height={22}
+                  className="object-contain block dark:hidden"
+                  onError={() => setLogoError(true)}
+                />
+              )}
+            </Link>
+          </div>
+          <div>
+            <p className="text-[10px] text-sidebar-foreground/35 font-light leading-none mt-0.5">
               Plateforme juridique
             </p>
-            </div>
-            
           </div>
-        
+        </div>
 
         <SidebarSeparator className="opacity-20 mx-3" />
 
@@ -253,8 +288,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* ── Footer ── */}
       <SidebarFooter className="border-t border-sidebar-border/30 pb-3 pt-2">
-        
-
         <SidebarSeparator className="opacity-20 mx-3 my-1" />
 
         {/* User info — click to open account menu */}
