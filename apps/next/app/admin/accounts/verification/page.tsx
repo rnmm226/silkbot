@@ -24,14 +24,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
-type AccountItem = {
-  id: string;
-  email: string;
-  emailVerified: boolean;
-  createdAt: string;
-  name?: string;
-};
+import { 
+  fetchAccounts as fetchAccountsApi,
+  verifyAccount as verifyAccountApi,
+  type User
+} from "@/lib/api/admin";
 
 type Notice = { message: string; type: "success" | "error" | "info" };
 
@@ -46,7 +43,7 @@ function formatDate(date: string) {
 }
 
 export default function AdminVerificationPage() {
-  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [accounts, setAccounts] = useState<User[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,14 +55,12 @@ export default function AdminVerificationPage() {
     setTimeout(() => setNotice(null), 3500);
   }, []);
 
-  const fetchAccounts = useCallback(
+  const loadAccounts = useCallback(
     async (silent = false) => {
       silent ? setRefreshing(true) : setLoading(true);
       try {
-        const res = await fetch("/api/admin/accounts");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
-        setAccounts(Array.isArray(data) ? data : data.accounts ?? []);
+        const data = await fetchAccountsApi();
+        setAccounts(data);
       } catch (err) {
         showNotice(err instanceof Error ? err.message : "Erreur de chargement", "error");
       } finally {
@@ -76,7 +71,7 @@ export default function AdminVerificationPage() {
     [showNotice],
   );
 
-  useEffect(() => { void fetchAccounts(); }, [fetchAccounts]);
+  useEffect(() => { void loadAccounts(); }, [loadAccounts]);
 
   const unverifiedAccounts = accounts
     .filter((acc) => !acc.emailVerified)
@@ -85,17 +80,10 @@ export default function AdminVerificationPage() {
       (acc.name?.toLowerCase().includes(query.toLowerCase()) ?? false)
     );
 
-  const verifyAccount = async (account: AccountItem) => {
+  const handleVerifyAccount = async (account: User) => {
     setVerifyingId(account.id);
     try {
-      const res = await fetch("/api/admin/accounts/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: account.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Vérification impossible");
-      
+      await verifyAccountApi(account.id);
       setAccounts((prev) =>
         prev.map((a) => (a.id === account.id ? { ...a, emailVerified: true } : a))
       );
@@ -135,8 +123,7 @@ export default function AdminVerificationPage() {
         </div>
       )}
 
-      {/* En-tête */}
-      <header className="flex items-center justify-between border-b bg-background px-6 py-4">
+      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
         <div>
           <h1 className="text-base font-medium">Vérification des comptes</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -146,16 +133,15 @@ export default function AdminVerificationPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => fetchAccounts(true)}
+          onClick={() => loadAccounts(true)}
           disabled={refreshing}
         >
           <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
           Actualiser
         </Button>
-      </header>
+      </div>
 
       <div className="flex flex-col gap-5 p-6">
-        {/* Statistiques */}
         <div className="grid gap-3 sm:grid-cols-3">
           {[
             { label: "Total", value: stats.total, icon: Users, color: "text-blue-500" },
@@ -179,7 +165,6 @@ export default function AdminVerificationPage() {
           ))}
         </div>
 
-        {/* Liste des comptes à vérifier */}
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Comptes en attente</CardTitle>
@@ -256,7 +241,7 @@ export default function AdminVerificationPage() {
                       size="sm"
                       className="w-full"
                       disabled={verifyingId === acc.id}
-                      onClick={() => verifyAccount(acc)}
+                      onClick={() => handleVerifyAccount(acc)}
                     >
                       {verifyingId === acc.id ? (
                         <>

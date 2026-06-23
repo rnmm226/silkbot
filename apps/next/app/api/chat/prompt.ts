@@ -21,6 +21,7 @@ Pour chaque passage fourni, décide ensuite s'il est pertinent. Un passage est p
 ÉTAPE 3 — TRAÇABILITÉ
 Pour chaque information utilisée provenant d'un document, identifie le chunk_id source exact.
 N'inclus dans used_sources QUE les chunks réellement pertinents et réellement cités dans ta réponse.
+Si le passage source possède un champ url, inclure ce lien dans used_sources (champ "url"). Sinon, laisser "url": null.
 
 RÈGLES ABSOLUES :
 - Ne jamais inventer un article, un numéro de loi ou une référence précise absente des documents.
@@ -69,7 +70,7 @@ Réponds UNIQUEMENT en JSON valide:
       return `[PASSAGE ${index + 1}]
 chunk_id: ${chunk.chunk_id}
 document: ${chunk.filename}
-page: ${chunk.page ?? 'N/A'}
+${chunk.source_url ? `url: ${chunk.source_url}` : `page: ${chunk.page ?? 'N/A'}`}
 similarité: ${chunk.similarity.toFixed(3)}
 
 ${chunk.content}`;
@@ -114,6 +115,7 @@ Réponds UNIQUEMENT en JSON valide contenant exactement cette structure :
       "chunk_id": "...",
       "filename": "...",
       "page": null,
+      "url": null,
       "excerpt": "..."
     }
   ]

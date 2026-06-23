@@ -161,7 +161,8 @@ export function Navigation() {
                 style={{
                   color: "var(--color-muted-foreground, #8a7f72)",
                 }}
-                
+                onMouseEnter={e => (e.currentTarget.style.color = "var(--color-foreground, #e8e0d0)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "var(--color-muted-foreground, #8a7f72)")}
               >
                 Connexion
               </Link>

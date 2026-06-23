@@ -57,6 +57,7 @@ export const ModelName = {
   Verification: 'Verification',
   Chat: 'Chat',
   Message: 'Message',
+  File: 'File',
   SourceDocument: 'SourceDocument',
   SourceDocumentSegment: 'SourceDocumentSegment'
 } as const
@@ -85,10 +86,10 @@ export const UserScalarFieldEnum = {
   image: 'image',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  role: 'role',
-  banned: 'banned',
+  banExpires: 'banExpires',
   banReason: 'banReason',
-  banExpires: 'banExpires'
+  banned: 'banned',
+  role: 'role'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -146,7 +147,8 @@ export const ChatScalarFieldEnum = {
   activeStreamId: 'activeStreamId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  userId: 'userId'
+  userId: 'userId',
+  isPinned: 'isPinned'
 } as const
 
 export type ChatScalarFieldEnum = (typeof ChatScalarFieldEnum)[keyof typeof ChatScalarFieldEnum]
@@ -164,10 +166,35 @@ export const MessageScalarFieldEnum = {
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
 
 
+export const FileScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  size: 'size',
+  mimeType: 'mimeType',
+  path: 'path',
+  storageKey: 'storageKey',
+  url: 'url',
+  description: 'description',
+  pageCount: 'pageCount',
+  extractedText: 'extractedText',
+  metadata: 'metadata',
+  userId: 'userId',
+  chatId: 'chatId',
+  messageId: 'messageId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FileScalarFieldEnum = (typeof FileScalarFieldEnum)[keyof typeof FileScalarFieldEnum]
+
+
 export const SourceDocumentScalarFieldEnum = {
   id: 'id',
   content: 'content',
-  createdAt: 'createdAt'
+  filename: 'filename',
+  source: 'source',
+  created_at: 'created_at',
+  source_url: 'source_url'
 } as const
 
 export type SourceDocumentScalarFieldEnum = (typeof SourceDocumentScalarFieldEnum)[keyof typeof SourceDocumentScalarFieldEnum]
@@ -177,11 +204,11 @@ export const SourceDocumentSegmentScalarFieldEnum = {
   id: 'id',
   content: 'content',
   sourceDocumentid: 'sourceDocumentid',
-  article_number: 'article_number',
-  chunk_index: 'chunk_index',
   createdAt: 'createdAt',
+  chunk_index: 'chunk_index',
   page_number: 'page_number',
-  tags: 'tags'
+  tags: 'tags',
+  article_number: 'article_number'
 } as const
 
 export type SourceDocumentSegmentScalarFieldEnum = (typeof SourceDocumentSegmentScalarFieldEnum)[keyof typeof SourceDocumentSegmentScalarFieldEnum]
@@ -200,6 +227,14 @@ export const JsonNullValueInput = {
 } as const
 
 export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {

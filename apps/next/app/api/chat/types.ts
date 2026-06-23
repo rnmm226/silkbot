@@ -3,15 +3,18 @@
 export interface RagChunk {
   chunk_id: string;
   filename: string;
-  page: number | null;
-  content: string;
+  page?: number | null;
   similarity: number;
+  content: string;
+  source_url?: string | null; // NOUVEAU — lien direct vers l'article (ex: Luca Pacioli)
+  source_type?: 'jort' | 'jibaya' | 'luca_pacioli'; // NOUVEAU — utile pour différencier le formatage des sources
 }
 
 export interface UsedSource {
   chunk_id: string;
   filename: string;
   page: number | null;
+  url?: string | null; // NOUVEAU — lien vers l'article si disponible (ex: Luca Pacioli)
   excerpt: string;
 }
 

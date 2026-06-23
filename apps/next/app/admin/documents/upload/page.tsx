@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { uploadDocument } from "@/lib/api/admin";
 
 const acceptedTypes = ["application/pdf", "text/plain", "text/markdown"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -65,41 +66,33 @@ export default function AdminUploadPage() {
     setUploadProgress(0);
     setError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
+    try {
+      // Simuler la progression
+      const interval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/admin/document-ref/upload");
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    };
-
-    xhr.onload = () => {
+      const result = await uploadDocument(file);
+      
+      clearInterval(interval);
+      setUploadProgress(100);
+      
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/admin/documents");
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'indexation");
+      setUploadProgress(0);
+    } finally {
       setUploading(false);
-      try {
-        const body = JSON.parse(xhr.responseText);
-        if (xhr.status < 200 || xhr.status >= 300) {
-          setError(body?.error ?? "Erreur lors de l'indexation");
-          return;
-        }
-        setSuccess(true);
-        setTimeout(() => {
-          router.push("/admin/documents");
-        }, 2000);
-      } catch {
-        setError("Erreur lors du traitement de la réponse");
-      }
-    };
-
-    xhr.onerror = () => {
-      setUploading(false);
-      setError("Connexion impossible lors de l'envoi");
-    };
-
-    xhr.send(formData);
+    }
   };
 
   const handleClear = () => {
@@ -114,19 +107,15 @@ export default function AdminUploadPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      {/* En-tête */}
-      <header className="flex items-center justify-between border-b bg-background px-6 py-4">
+      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
         <div>
           <h1 className="text-base font-medium">Importer un document</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Ajoutez une nouvelle source à la base documentaire
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => router.push("/admin/documents")}>
-          <ArrowLeft className="size-3.5" />
-          Retour
-        </Button>
-      </header>
+      
+      </div>
 
       <div className="flex flex-1 items-center justify-center p-6">
         <Card className="w-full max-w-2xl">
@@ -239,12 +228,12 @@ export default function AdminUploadPage() {
                   >
                     {uploading ? (
                       <>
-                        <RefreshCw className="size-4 animate-spin" />
+                        <RefreshCw className="size-4 animate-spin mr-1.5" />
                         Indexation…
                       </>
                     ) : (
                       <>
-                        <Upload className="size-4" />
+                        <Upload className="size-4 mr-1.5" />
                         Indexer
                       </>
                     )}

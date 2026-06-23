@@ -66,18 +66,21 @@ export default function SettingsPage() {
   const { data: session } = authClient.useSession()
   const [activeTab, setActiveTab] = useState<TabKey>("general")
 
-  const initials = session?.user?.name
-    ?.split(' ')
-    .map((n: string) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) ?? '?'
+  // FIX: si le nom est une chaîne vide (par opposition à null/undefined), l'ancien
+  // calcul produisait des initiales vides ('') au lieu du repli '?'. On normalise
+  // d'abord le nom (trim) avant de décider s'il y a vraiment quelque chose à initialer.
+  const rawName = session?.user?.name?.trim() || ''
+  const initials = rawName
+    ? rawName.split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?'
 
   // ── Nom (sauvegarde automatique au blur) ──
   const [nameValue, setNameValue] = useState(session?.user?.name || "")
   const [nameSaving, setNameSaving] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
-  
+  // NOUVEAU: l'ancien code n'avait aucun retour en cas d'échec de la sauvegarde du nom
+  const [nameError, setNameError] = useState<string | null>(null)
+
   useEffect(() => {
     setNameValue(session?.user?.name || "")
   }, [session?.user?.name])
@@ -86,6 +89,7 @@ export default function SettingsPage() {
     const trimmed = nameValue.trim()
     if (!trimmed || trimmed === session?.user?.name) return
     setNameSaving(true)
+    setNameError(null)
     await authClient.updateUser({
       name: trimmed,
       fetchOptions: {
@@ -93,9 +97,13 @@ export default function SettingsPage() {
           setNameSaved(true)
           setTimeout(() => setNameSaved(false), 2000)
         },
+        // NOUVEAU: affiche un message si la sauvegarde échoue, au lieu d'échouer en silence
+        onError: (ctx: any) => {
+          setNameError(ctx?.error?.message || "Impossible d'enregistrer le nom.")
+        },
       },
     })
-    
+
     setNameSaving(false)
   }
 
@@ -119,6 +127,14 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+  // NOUVEAU: le message de mot de passe restait affiché indéfiniment (contrairement
+  // au message "nameSaved" qui s'efface après 2s) — on harmonise ce comportement.
+  useEffect(() => {
+    if (!passwordMessage) return
+    const t = setTimeout(() => setPasswordMessage(null), 5000)
+    return () => clearTimeout(t)
+  }, [passwordMessage])
 
   const mapPasswordError = (raw: string) => {
     const lower = raw.toLowerCase()
@@ -166,6 +182,12 @@ export default function SettingsPage() {
     setPasswordSaving(false)
   }
 
+  // NOUVEAU: l'ancien code ne permettait de valider avec "Entrée" que depuis le champ
+  // de confirmation — on harmonise pour que les trois champs se comportent pareil.
+  const handlePasswordFieldEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") submitPasswordChange()
+  }
+
   const handleLogout = async () => {
     await authClient.signOut({
       fetchOptions: {
@@ -198,6 +220,7 @@ export default function SettingsPage() {
             <button
               key={key}
               onClick={() => setActiveTab(key)}
+              aria-current={activeTab === key ? "page" : undefined}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors text-left ${
                 activeTab === key
                   ? "bg-accent text-accent-foreground font-medium"
@@ -213,122 +236,146 @@ export default function SettingsPage() {
 
       {/* ── Contenu ── */}
       <div className="flex-1 px-10 py-10 max-w-2xl">
+        {/* NOUVEAU: léger fondu lors du changement d'onglet — feedback visuel discret
+            plutôt qu'un changement de contenu instantané et sec. La clé "activeTab"
+            force le remontage du bloc, ce qui relance l'animation à chaque clic. */}
+        <div key={activeTab} style={{ animation: "settingsTabFadeIn 0.25s ease both" }}>
 
-        {activeTab === "general" && (
-          <div>
-            <h1 className="font-serif text-xl text-foreground mb-6">Profil</h1>
+          {activeTab === "general" && (
+            <div>
+              <h1 className="font-serif text-xl text-foreground mb-6">Profil</h1>
 
-            <SettingsRow label="Avatar">
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-sm font-medium text-accent-foreground">
-                {initials}
-              </div>
-            </SettingsRow>
+              <SettingsRow label="Avatar">
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-sm font-medium text-accent-foreground">
+                  {initials}
+                </div>
+              </SettingsRow>
 
-            <SettingsRow label="Nom complet">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={nameValue}
-                  onChange={(e) => setNameValue(e.target.value)}
-                  onBlur={saveName}
-                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
-                  className="w-64 text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring text-right"
-                />
-                <span className="w-4 shrink-0">
-                  {nameSaving && <Loader2Icon className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-                  {!nameSaving && nameSaved && <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />}
-                </span>
-              </div>
-            </SettingsRow>
+              <SettingsRow label="Nom complet">
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={nameValue}
+                      onChange={(e) => setNameValue(e.target.value)}
+                      onBlur={saveName}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
+                      className="w-64 text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring text-right"
+                      aria-label="Nom complet"
+                    />
+                    <span className="w-4 shrink-0">
+                      {nameSaving && <Loader2Icon className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                      {!nameSaving && nameSaved && <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />}
+                    </span>
+                  </div>
+                  {/* NOUVEAU: retour d'erreur si la sauvegarde du nom échoue */}
+                  {nameError && (
+                    <p className="text-xs text-destructive">{nameError}</p>
+                  )}
+                </div>
+              </SettingsRow>
 
-            <SettingsRow label="Adresse e-mail" description="Non modifiable">
-              <span className="text-sm text-muted-foreground">{session?.user?.email || "—"}</span>
-            </SettingsRow>
-          </div>
-        )}
+              <SettingsRow label="Adresse e-mail" description="Non modifiable">
+                <span className="text-sm text-muted-foreground">{session?.user?.email || "—"}</span>
+              </SettingsRow>
+            </div>
+          )}
 
-        {activeTab === "security" && (
-          <div>
-            <h1 className="font-serif text-xl text-foreground mb-6">Sécurité</h1>
+          {activeTab === "security" && (
+            <div>
+              <h1 className="font-serif text-xl text-foreground mb-6">Sécurité</h1>
 
-            {hasCredentialAccount === false ? (
-              <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-4 flex gap-3">
-                <KeyRoundIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Ce compte est connecté via {linkedProvider || "un fournisseur externe"} et ne possède pas de mot de passe propre à modifier ici.
-                </p>
-              </div>
-            ) : (
-              <>
-                <SettingsRow label="Mot de passe actuel" stacked>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </SettingsRow>
-                <SettingsRow label="Nouveau mot de passe" stacked>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </SettingsRow>
-                <SettingsRow label="Confirmer le nouveau mot de passe" stacked>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") submitPasswordChange() }}
-                    className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </SettingsRow>
-
-                {passwordMessage && (
-                  <p className={`text-xs mt-3 ${passwordMessage.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
-                    {passwordMessage.text}
+              {hasCredentialAccount === false ? (
+                <div className="border border-amber-500/30 bg-amber-500/5 rounded-lg p-4 flex gap-3">
+                  <KeyRoundIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Ce compte est connecté via {linkedProvider || "un fournisseur externe"} et ne possède pas de mot de passe propre à modifier ici.
                   </p>
-                )}
+                </div>
+              ) : (
+                <>
+                  <SettingsRow label="Mot de passe actuel" stacked>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      onKeyDown={handlePasswordFieldEnter}
+                      className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+                      aria-label="Mot de passe actuel"
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Nouveau mot de passe" stacked>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      onKeyDown={handlePasswordFieldEnter}
+                      className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+                      aria-label="Nouveau mot de passe"
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Confirmer le nouveau mot de passe" stacked>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onKeyDown={handlePasswordFieldEnter}
+                      className="w-full text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+                      aria-label="Confirmer le nouveau mot de passe"
+                    />
+                  </SettingsRow>
 
+                  {passwordMessage && (
+                    <p className={`text-xs mt-3 ${passwordMessage.type === "success" ? "text-emerald-600" : "text-destructive"}`}>
+                      {passwordMessage.text}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={submitPasswordChange}
+                    disabled={passwordSaving}
+                    className="mt-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {passwordSaving ? "Mise à jour…" : "Mettre à jour le mot de passe"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === "notifications" && (
+            <div>
+              <h1 className="font-serif text-xl text-foreground mb-6">Notifications</h1>
+              <p className="text-sm text-muted-foreground">
+                Aucune préférence de notification n'est configurable pour le moment.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "account" && (
+            <div>
+              <h1 className="font-serif text-xl text-foreground mb-6">Compte</h1>
+              <SettingsRow label="Session active" description={session?.user?.email}>
                 <button
-                  onClick={submitPasswordChange}
-                  disabled={passwordSaving}
-                  className="mt-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/5 transition-colors"
                 >
-                  {passwordSaving ? "Mise à jour…" : "Mettre à jour le mot de passe"}
+                  <LogOutIcon className="w-3.5 h-3.5" />
+                  Se déconnecter
                 </button>
-              </>
-            )}
-          </div>
-        )}
+              </SettingsRow>
+            </div>
+          )}
 
-        {activeTab === "notifications" && (
-          <div>
-            <h1 className="font-serif text-xl text-foreground mb-6">Notifications</h1>
-            <p className="text-sm text-muted-foreground">
-              Aucune préférence de notification n'est configurable pour le moment.
-            </p>
-          </div>
-        )}
-
-        {activeTab === "account" && (
-          <div>
-            <h1 className="font-serif text-xl text-foreground mb-6">Compte</h1>
-            <SettingsRow label="Session active" description={session?.user?.email}>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/5 transition-colors"
-              >
-                <LogOutIcon className="w-3.5 h-3.5" />
-                Se déconnecter
-              </button>
-            </SettingsRow>
-          </div>
-        )}
-
+        </div>
       </div>
+
+      <style>{`
+        @keyframes settingsTabFadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }

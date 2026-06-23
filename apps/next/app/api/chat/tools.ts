@@ -7,6 +7,12 @@ const API_URL =
 
 const DEFAULT_TIMEOUT = 10000;
 const MAX_RETRIES = 2;
+// ✅ TTL du cache d'endpoints : 60 secondes.
+// Avant : le cache ne s'invalidait jamais après le premier check,
+// donc un endpoint qui redevenait disponible après un redémarrage
+// du backend Python restait marqué "indisponible" jusqu'au redémarrage
+// du serveur Next.js.
+const ENDPOINT_CACHE_TTL_MS = 60_000;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -17,7 +23,7 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -37,49 +43,59 @@ async function fetchWithRetry(
   retries: number = MAX_RETRIES
 ): Promise<any> {
   let lastError: Error | null = null;
-  
+
   for (let i = 0; i <= retries; i++) {
     try {
       const response = await fetchWithTimeout(url, options);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       console.warn(`[fetchWithRetry] Tentative ${i + 1}/${retries + 1} échouée:`, lastError.message);
-      
+
       if (i < retries) {
         await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
       }
     }
   }
-  
+
   throw lastError || new Error('Toutes les tentatives ont échoué');
 }
 
-// ── Cache des endpoints ─────────────────────────────────────────
+// ── Cache des endpoints (avec TTL) ──────────────────────────────
 
-let endpointCache: Record<string, boolean> = {};
+// ✅ On stocke désormais { available, checkedAt } au lieu d'un simple
+// booléen, pour pouvoir invalider l'entrée après ENDPOINT_CACHE_TTL_MS.
+interface EndpointCacheEntry {
+  available: boolean;
+  checkedAt: number;
+}
+
+let endpointCache: Record<string, EndpointCacheEntry> = {};
 
 async function checkEndpoint(endpoint: string): Promise<boolean> {
-  if (endpointCache[endpoint] !== undefined) {
-    return endpointCache[endpoint];
+  const cached = endpointCache[endpoint];
+  const now = Date.now();
+
+  if (cached && now - cached.checkedAt < ENDPOINT_CACHE_TTL_MS) {
+    return cached.available;
   }
-  
+
   try {
     const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'HEAD',
       signal: AbortSignal.timeout(2000),
     });
     const available = response.ok || response.status === 405;
-    endpointCache[endpoint] = available;
-    console.log(`[checkEndpoint] ${endpoint}: ${available ? '✅' : '❌'}`);
+    endpointCache[endpoint] = { available, checkedAt: now };
+    console.log(`[checkEndpoint] ${endpoint}: ${available ? '✅' : '❌'} (cache ${ENDPOINT_CACHE_TTL_MS / 1000}s)`);
     return available;
   } catch {
-    endpointCache[endpoint] = false;
+    endpointCache[endpoint] = { available: false, checkedAt: now };
     return false;
   }
 }
@@ -94,7 +110,7 @@ export async function semantic_search(query: string): Promise<SearchResponse> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: query }),
     });
-    
+
     const chunks = data.chunks || [];
     console.log(`[semantic_search] ✅ ${chunks.length} chunks trouvés`);
     return { chunks };
@@ -106,12 +122,12 @@ export async function semantic_search(query: string): Promise<SearchResponse> {
 
 export async function smart_search(query: string): Promise<SearchResponse> {
   console.log(`[smart_search] 🔍 Recherche intelligente: "${query}"`);
-  
+
   const endpoints = ['/search', '/search/articles', '/search/tags'];
   const available = await Promise.all(endpoints.map(e => checkEndpoint(e)));
-  
+
   const results: RagChunk[] = [];
-  
+
   for (let i = 0; i < endpoints.length; i++) {
     if (available[i]) {
       try {
@@ -131,18 +147,18 @@ export async function smart_search(query: string): Promise<SearchResponse> {
       }
     }
   }
-  
+
   if (results.length === 0) {
     console.log('[smart_search] ⚠️ Aucun résultat, fallback vers semantic_search');
     return semantic_search(query);
   }
-  
+
   const unique = results.filter(
     (chunk, index, self) =>
       index === self.findIndex(c => c.chunk_id === chunk.chunk_id)
   );
   unique.sort((a, b) => b.similarity - a.similarity);
-  
+
   console.log(`[smart_search] ✅ ${unique.length} chunks uniques`);
   return { chunks: unique.slice(0, 20) };
 }
@@ -248,8 +264,8 @@ export async function checkApiConnection(): Promise<{ connected: boolean; messag
       return { connected: false, message: `⚠️ API répond avec status ${response.status}` };
     }
   } catch (error) {
-    return { 
-      connected: false, 
+    return {
+      connected: false,
       message: `❌ API inaccessible: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
     };
   }

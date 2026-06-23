@@ -390,6 +390,7 @@ export const ModelName = {
   Verification: 'Verification',
   Chat: 'Chat',
   Message: 'Message',
+  File: 'File',
   SourceDocument: 'SourceDocument',
   SourceDocumentSegment: 'SourceDocumentSegment'
 } as const
@@ -407,7 +408,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "chat" | "message" | "sourceDocument" | "sourceDocumentSegment"
+    modelProps: "user" | "session" | "account" | "verification" | "chat" | "message" | "file" | "sourceDocument" | "sourceDocumentSegment"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -855,6 +856,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    File: {
+      payload: Prisma.$FilePayload<ExtArgs>
+      fields: Prisma.FileFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FileFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FileFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        findFirst: {
+          args: Prisma.FileFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FileFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        findMany: {
+          args: Prisma.FileFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>[]
+        }
+        create: {
+          args: Prisma.FileCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        createMany: {
+          args: Prisma.FileCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FileCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>[]
+        }
+        delete: {
+          args: Prisma.FileDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        update: {
+          args: Prisma.FileUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        deleteMany: {
+          args: Prisma.FileDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FileUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FileUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>[]
+        }
+        upsert: {
+          args: Prisma.FileUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FilePayload>
+        }
+        aggregate: {
+          args: Prisma.FileAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFile>
+        }
+        groupBy: {
+          args: Prisma.FileGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FileGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FileCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FileCountAggregateOutputType> | number
+        }
+      }
+    }
     SourceDocument: {
       payload: Prisma.$SourceDocumentPayload<ExtArgs>
       fields: Prisma.SourceDocumentFieldRefs
@@ -953,18 +1028,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
           args: Prisma.SourceDocumentSegmentFindManyArgs<ExtArgs>
           result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>[]
         }
-        create: {
-          args: Prisma.SourceDocumentSegmentCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>
-        }
-        createMany: {
-          args: Prisma.SourceDocumentSegmentCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.SourceDocumentSegmentCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>[]
-        }
         delete: {
           args: Prisma.SourceDocumentSegmentDeleteArgs<ExtArgs>
           result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>
@@ -984,10 +1047,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         updateManyAndReturn: {
           args: Prisma.SourceDocumentSegmentUpdateManyAndReturnArgs<ExtArgs>
           result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>[]
-        }
-        upsert: {
-          args: Prisma.SourceDocumentSegmentUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$SourceDocumentSegmentPayload>
         }
         aggregate: {
           args: Prisma.SourceDocumentSegmentAggregateArgs<ExtArgs>
@@ -1050,10 +1109,10 @@ export const UserScalarFieldEnum = {
   image: 'image',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  role: 'role',
-  banned: 'banned',
+  banExpires: 'banExpires',
   banReason: 'banReason',
-  banExpires: 'banExpires'
+  banned: 'banned',
+  role: 'role'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -1111,7 +1170,8 @@ export const ChatScalarFieldEnum = {
   activeStreamId: 'activeStreamId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  userId: 'userId'
+  userId: 'userId',
+  isPinned: 'isPinned'
 } as const
 
 export type ChatScalarFieldEnum = (typeof ChatScalarFieldEnum)[keyof typeof ChatScalarFieldEnum]
@@ -1129,10 +1189,35 @@ export const MessageScalarFieldEnum = {
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
 
 
+export const FileScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  size: 'size',
+  mimeType: 'mimeType',
+  path: 'path',
+  storageKey: 'storageKey',
+  url: 'url',
+  description: 'description',
+  pageCount: 'pageCount',
+  extractedText: 'extractedText',
+  metadata: 'metadata',
+  userId: 'userId',
+  chatId: 'chatId',
+  messageId: 'messageId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FileScalarFieldEnum = (typeof FileScalarFieldEnum)[keyof typeof FileScalarFieldEnum]
+
+
 export const SourceDocumentScalarFieldEnum = {
   id: 'id',
   content: 'content',
-  createdAt: 'createdAt'
+  filename: 'filename',
+  source: 'source',
+  created_at: 'created_at',
+  source_url: 'source_url'
 } as const
 
 export type SourceDocumentScalarFieldEnum = (typeof SourceDocumentScalarFieldEnum)[keyof typeof SourceDocumentScalarFieldEnum]
@@ -1142,11 +1227,11 @@ export const SourceDocumentSegmentScalarFieldEnum = {
   id: 'id',
   content: 'content',
   sourceDocumentid: 'sourceDocumentid',
-  article_number: 'article_number',
-  chunk_index: 'chunk_index',
   createdAt: 'createdAt',
+  chunk_index: 'chunk_index',
   page_number: 'page_number',
-  tags: 'tags'
+  tags: 'tags',
+  article_number: 'article_number'
 } as const
 
 export type SourceDocumentSegmentScalarFieldEnum = (typeof SourceDocumentSegmentScalarFieldEnum)[keyof typeof SourceDocumentSegmentScalarFieldEnum]
@@ -1165,6 +1250,14 @@ export const JsonNullValueInput = {
 } as const
 
 export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
 export const QueryMode = {
@@ -1390,6 +1483,7 @@ export type GlobalOmitConfig = {
   verification?: Prisma.VerificationOmit
   chat?: Prisma.ChatOmit
   message?: Prisma.MessageOmit
+  file?: Prisma.FileOmit
   sourceDocument?: Prisma.SourceDocumentOmit
   sourceDocumentSegment?: Prisma.SourceDocumentSegmentOmit
 }

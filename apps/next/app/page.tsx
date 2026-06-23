@@ -229,7 +229,7 @@ export default function Home() {
       <DevelopersSection />
 
       {/* ── Testimonials Section ── */}
-      <TestimonialsSection />
+      
 
       {/* ── Pricing Section ── */}
       <PricingSection />

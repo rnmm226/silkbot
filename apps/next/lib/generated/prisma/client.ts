@@ -72,12 +72,17 @@ export type Chat = Prisma.ChatModel
  */
 export type Message = Prisma.MessageModel
 /**
+ * Model File
+ * 
+ */
+export type File = Prisma.FileModel
+/**
  * Model SourceDocument
  * 
  */
 export type SourceDocument = Prisma.SourceDocumentModel
 /**
  * Model SourceDocumentSegment
- * 
+ * This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
  */
 export type SourceDocumentSegment = Prisma.SourceDocumentSegmentModel

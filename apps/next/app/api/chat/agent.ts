@@ -6,10 +6,17 @@ import { buildRagOnlyResponse, generateFallbackAnswer } from "./fallback";
 import { planQuestion } from "./planner";
 import { executePlan } from "./executor";
 import { executeGeminiDecisions, decideToolsWithGemini } from "./gemini-tools";
+import { AgentError, LLMError, handleAgentError } from "./errors";
 import type { RagChunk, GeminiStructuredResponse } from "./types";
 
 const MAX_ITERATIONS = 3;
 const MIN_CHUNKS_THRESHOLD = 5;
+
+// ✅ Nombre de chunks envoyés au prompt final.
+// Avant : 3 (trop peu vu qu'on accumule jusqu'à 20 chunks sur 3 itérations).
+// On monte à 8 — assez pour couvrir plusieurs articles/sources sans
+// faire exploser la taille du prompt envoyé à Gemini.
+const FINAL_CHUNKS_LIMIT = 8;
 
 function mergeAndDedupeChunks(allChunks: RagChunk[]): RagChunk[] {
     const unique = allChunks.filter(
@@ -22,15 +29,15 @@ function mergeAndDedupeChunks(allChunks: RagChunk[]): RagChunk[] {
 
 function hasEnoughInformation(chunks: RagChunk[], question: string): boolean {
     if (chunks.length >= MIN_CHUNKS_THRESHOLD) return true;
-    
-    const isSpecific = question.length > 50 || 
-                       question.includes('article') || 
+
+    const isSpecific = question.length > 50 ||
+                       question.includes('article') ||
                        question.includes('loi') ||
                        question.includes('décret') ||
                        question.includes('code') ||
                        question.includes('TVA') ||
                        question.includes('exonération');
-    
+
     if (isSpecific && chunks.length < 3) return false;
     return chunks.length >= 3;
 }
@@ -119,6 +126,10 @@ export async function runAgent(
     let iteration = 0;
     let currentQuery = question;
     const steps: string[] = [];
+    // ✅ On garde une trace des erreurs d'outils rencontrées pendant
+    // la boucle, pour pouvoir les exposer dans thinking_summary même
+    // si la boucle se termine "normalement" (decision.continue === false).
+    const toolErrors: string[] = [];
 
     console.log('[Agent] Boucle ReAct');
 
@@ -140,13 +151,16 @@ export async function runAgent(
                     newChunks.push(...result.result.chunks);
                     steps.push(`${result.tool}: ${result.result.chunks.length} passages`);
                 } else if (result.error) {
-                    steps.push(`${result.tool}: Erreur`);
+                    // ✅ On distingue maintenant les erreurs réelles (errors.ts)
+                    // dans les steps ET dans toolErrors pour réutilisation.
+                    steps.push(`${result.tool}: Erreur — ${result.error}`);
+                    toolErrors.push(`${result.tool}: ${result.error}`);
                 }
             }
 
             allChunks = [...allChunks, ...newChunks];
             const mergedChunks = mergeAndDedupeChunks(allChunks);
-            
+
             console.log(`[Agent] ${mergedChunks.length} chunks uniques`);
             steps.push(`${mergedChunks.length} passages uniques`);
 
@@ -176,6 +190,8 @@ export async function runAgent(
         } catch (error) {
             console.error(`[Agent] Erreur itération ${iteration + 1}:`, error);
             steps.push(`⚠️ Erreur: ${error instanceof Error ? error.message : 'Inconnue'}`);
+            // On s'assure d'avoir au moins les chunks dédupliqués jusqu'ici
+            allChunks = mergeAndDedupeChunks(allChunks);
             break;
         }
 
@@ -185,16 +201,31 @@ export async function runAgent(
     console.log(`[Agent] Fin. ${allChunks.length} chunks`);
 
     console.log('[Agent] Étape finale');
+    // ✅ FINAL_CHUNKS_LIMIT (8) au lieu de 3 — on exploite enfin
+    // le travail fait par la boucle ReAct sur plusieurs itérations.
     const refinePrompt = buildUserPrompt(
-    question,
-    draft,
-    allChunks.slice(0, 3)
-);
-    const finalResult = await callWithFallback(refinePrompt, SYSTEM_PROMPT);
+        question,
+        draft,
+        allChunks.slice(0, FINAL_CHUNKS_LIMIT)
+    );
+
+    let finalResult;
+    try {
+        finalResult = await callWithFallback(refinePrompt, SYSTEM_PROMPT);
+    } catch (error) {
+        // ✅ callWithFallback ne devrait normalement pas throw (il catch déjà
+        // les erreurs retryables et renvoie null), mais si jamais une erreur
+        // non-retryable remonte, on la transforme en LLMError exploitable.
+        return handleAgentError(new LLMError(error instanceof Error ? error.message : String(error)));
+    }
 
     if (!finalResult) {
         console.warn('[Agent] LLM indisponible, fallback');
-        return generateFallbackAnswer(question, allChunks, draft);
+        const fallback = generateFallbackAnswer(question, allChunks, draft);
+        if (toolErrors.length > 0) {
+            fallback.thinking_summary.steps.push(...toolErrors);
+        }
+        return fallback;
     }
 
     const parsed = parseStructured(finalResult.text, allChunks);
@@ -204,7 +235,7 @@ export async function runAgent(
         `${iteration} itérations`,
         ...parsed.thinking_summary.steps,
     ];
-    
+
     return parsed;
 }
 
@@ -236,8 +267,18 @@ export async function runAgentGemini(
     console.log(`[AgentGemini] ${chunks.length} chunks`);
 
     console.log('[AgentGemini] Réponse finale');
-    const refinePrompt = buildUserPrompt(question, draft, chunks);
-    const finalResult = await callWithFallback(refinePrompt, SYSTEM_PROMPT);
+    // ✅ Même correction ici : FINAL_CHUNKS_LIMIT au lieu de tout passer
+    // sans limite explicite (avant: "chunks" complet, jusqu'à 20 — ce qui
+    // pouvait au contraire être TROP gros pour le prompt selon les cas).
+    // On harmonise les deux agents sur la même limite.
+    const refinePrompt = buildUserPrompt(question, draft, chunks.slice(0, FINAL_CHUNKS_LIMIT));
+
+    let finalResult;
+    try {
+        finalResult = await callWithFallback(refinePrompt, SYSTEM_PROMPT);
+    } catch (error) {
+        return handleAgentError(new LLMError(error instanceof Error ? error.message : String(error)));
+    }
 
     if (!finalResult) {
         console.warn('[AgentGemini] LLM indisponible, fallback');

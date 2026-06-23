@@ -149,106 +149,108 @@ export function PricingSection() {
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((plan, idx) => (
-            <div
-              key={plan.name}
-              className={`relative rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 ${
-                plan.popular 
-                  ? "lg:p-8" 
-                  : ""
-              }`}
-              style={{
-                background: 'var(--color-card,#1a1815)',
-                border: plan.popular 
-                  ? `2px solid ${'var(--primary,#c4956a)'}`
-                  : '1px solid var(--color-border,#2a2520)',
-                boxShadow: plan.popular 
-                  ? `0 10px 40px color-mix(in oklch, var(--primary,#c4956a) 15%, transparent)`
-                  : 'none',
-              }}
-            >
+            // NOUVEAU: enveloppe externe non "overflow-hidden" pour que le badge
+            // "Recommandé" (positionné en -top-3) ne soit jamais rogné par l'effet shine
+            <div key={plan.name} className="relative">
               {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-medium whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/80"
-                  >
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-[10px] font-medium whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/80">
                   Recommandé
                 </span>
               )}
 
-              {/* Plan Header */}
-              <div className="mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4"
-                  style={{
-                    background: 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)',
-                    border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 20%, transparent)',
-                  }}>
-                  {plan.icon}
-                </div>
-                <h3 className="font-serif text-xl font-semibold mb-1"
-                  style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
-                  {plan.name}
-                </h3>
-                <p className="text-xs font-light"
-                  style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
-                  {plan.description}
-                </p>
-              </div>
-
-              {/* Price */}
-              <div className="mb-6 pb-6"
-                style={{ borderBottom: '1px solid var(--color-border,#2a2520)' }}>
-                {plan.price.monthly !== null ? (
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-serif text-4xl font-bold"
-                      style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
-                      {isAnnual ? plan.price.annual : plan.price.monthly} DT
-                    </span>
-                    <span className="text-xs font-light"
-                      style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
-                      /mois
-                    </span>
-                  </div>
-                ) : (
-                  <span className="font-serif text-2xl font-bold"
-                    style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
-                    Sur mesure
-                  </span>
-                )}
-              </div>
-
-              {/* Features */}
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-3">
-                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      style={{ color: 'var(--primary,#c4956a)' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-xs font-light"
-                      style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <Link
-                href={plan.price.monthly === 0 ? "/register" : plan.price.monthly === null ? "/contact" : "/register"}
-                className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all group ${
-                  plan.popular
-                    ? "hover:opacity-90"
-                    : "hover:translate-x-0.5"
+              <div
+                className={`relative rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 ${
+                  plan.popular 
+                    ? "lg:p-8 recommended-shine overflow-hidden" // NOUVEAU: lumière en boucle douce sur le plan recommandé
+                    : ""
                 }`}
                 style={{
-                  background: plan.popular 
-                    ? 'var(--primary,#c4956a)' 
-                    : 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)',
-                  color: plan.popular ? 'var(--primary-foreground)' : 'var(--primary,#c4956a)',
-                  border: plan.popular ? 'none' : '1px solid color-mix(in oklch, var(--primary,#c4956a) 20%, transparent)',
+                  background: 'var(--color-card,#1a1815)',
+                  border: plan.popular 
+                    ? `2px solid ${'var(--primary,#c4956a)'}`
+                    : '1px solid var(--color-border,#2a2520)',
+                  boxShadow: plan.popular 
+                    ? `0 10px 40px color-mix(in oklch, var(--primary,#c4956a) 15%, transparent)`
+                    : 'none',
                 }}
               >
-                {plan.cta}
-                <span className="transition-transform group-hover:translate-x-1">→</span>
-              </Link>
+                {/* Plan Header */}
+                <div className="mb-6">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl mb-4"
+                    style={{
+                      background: 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)',
+                      border: '1px solid color-mix(in oklch, var(--primary,#c4956a) 20%, transparent)',
+                    }}>
+                    {plan.icon}
+                  </div>
+                  <h3 className="font-serif text-xl font-semibold mb-1"
+                    style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+                    {plan.name}
+                  </h3>
+                  <p className="text-xs font-light"
+                    style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                    {plan.description}
+                  </p>
+                </div>
+
+                {/* Price */}
+                <div className="mb-6 pb-6"
+                  style={{ borderBottom: '1px solid var(--color-border,#2a2520)' }}>
+                  {plan.price.monthly !== null ? (
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-serif text-4xl font-bold"
+                        style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+                        {isAnnual ? plan.price.annual : plan.price.monthly} DT
+                      </span>
+                      <span className="text-xs font-light"
+                        style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                        /mois
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-serif text-2xl font-bold"
+                      style={{ color: 'var(--color-foreground,#e8e0d0)' }}>
+                      Sur mesure
+                    </span>
+                  )}
+                </div>
+
+                {/* Features */}
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3">
+                      <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        style={{ color: 'var(--primary,#c4956a)' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-xs font-light"
+                        style={{ color: 'var(--color-muted-foreground,#8a7f72)' }}>
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <Link
+                  href={plan.price.monthly === 0 ? "/register" : plan.price.monthly === null ? "/contact" : "/register"}
+                  className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all group ${
+                    plan.popular
+                      ? "hover:opacity-90 btn-shine" // NOUVEAU: léger reflet au survol, cohérent avec le CTA du Hero
+                      : "hover:translate-x-0.5"
+                  }`}
+                  style={{
+                    background: plan.popular 
+                      ? 'var(--primary,#c4956a)' 
+                      : 'color-mix(in oklch, var(--primary,#c4956a) 10%, transparent)',
+                    color: plan.popular ? 'var(--primary-foreground)' : 'var(--primary,#c4956a)',
+                    border: plan.popular ? 'none' : '1px solid color-mix(in oklch, var(--primary,#c4956a) 20%, transparent)',
+                  }}
+                >
+                  {plan.cta}
+                  <span className="transition-transform group-hover:translate-x-1">→</span>
+                </Link>
+              </div>
             </div>
           ))}
         </div>

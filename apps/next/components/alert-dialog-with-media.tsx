@@ -50,7 +50,7 @@ export function AlertDialogWithMedia() {
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogTrigger asChild>
-        <Button variant="outline">Share Conversation</Button>
+        <Button variant="outline">Share </Button>
       </AlertDialogTrigger>
 
       <AlertDialogContent>
@@ -60,7 +60,7 @@ export function AlertDialogWithMedia() {
           </div>
 
           <AlertDialogTitle>
-            Share this conversation
+            Share Conversation
           </AlertDialogTitle>
 
           <AlertDialogDescription>

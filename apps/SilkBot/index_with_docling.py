@@ -69,10 +69,11 @@ else:
 # ─────────────────────────────────────────────
 DB_URL = "postgresql://postgres:secret123@localhost:5432/monapp"
 
-# 🔹 DEUX DOSSIERS SOURCES
+# 🔹 TROIS DOSSIERS SOURCES
 FOLDERS = {
     "jibaya": "downloaded_pdfs",
     "jort": "downloaded_jort_pdfs",
+    "luca_pacioli": "downloaded_pacioli_pdfs",  # NOUVEAU
 }
 
 PARALLEL_WORKERS = 2
@@ -84,6 +85,24 @@ PDF_EXTRACTION_TIMEOUT = 60
 
 SKIP_EXISTING = True
 PROGRESS_FILE = "indexation_progress.json"
+
+# 🔹 MAPPING fichier → URL pour les sources avec lien web (Luca Pacioli) — NOUVEAU
+PACIOLI_URL_MAP_FILE = "luca_pacioli_urls.json"
+
+
+def load_pacioli_url_map():
+    if not os.path.exists(PACIOLI_URL_MAP_FILE):
+        print(f"⚠️  Mapping URL introuvable: {PACIOLI_URL_MAP_FILE} (les articles Luca Pacioli seront indexés sans source_url)")
+        return {}
+    try:
+        with open(PACIOLI_URL_MAP_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️  Erreur lecture {PACIOLI_URL_MAP_FILE}: {e}")
+        return {}
+
+
+PACIOLI_URL_MAP = load_pacioli_url_map()  # NOUVEAU
 
 
 # ─────────────────────────────────────────────
@@ -195,6 +214,8 @@ def detect_source(filename, relative_path="", default="autre"):
         return 'jibaya'
     if 'jort' in s or 'journal officiel' in s or 'journal-officiel' in s:
         return 'jort'
+    if 'pacioli' in s or 'luca-pacioli' in s or 'luca_pacioli' in s:  # NOUVEAU
+        return 'luca_pacioli'
     return default
 
 
@@ -271,6 +292,7 @@ KEYWORD_TAGS = {
     'change': ['change', 'devises', 'bct', 'banque centrale'],
     'foncier': ['foncier', 'immobilier', 'tnb', 'taxe sur les immeubles'],
     'penal_fiscal': ['sanction', 'pénalité', 'infraction fiscale'],
+    'comptabilite': ['comptabilité', 'bilan', 'amortissement', 'normes comptables'],  # NOUVEAU (utile pour Pacioli)
 }
 
 
@@ -417,7 +439,7 @@ def extract_from_pdf(filepath):
 
 
 # ─────────────────────────────────────────────
-# INSERTION DB — connexion thread-local + fix article_number
+# INSERTION DB — connexion thread-local + fix article_number + source_url
 # ─────────────────────────────────────────────
 def insert_document(result):
     conn = get_db_connection()
@@ -431,12 +453,23 @@ def insert_document(result):
         if existing:
             return 0
 
-        # Insérer le document (content = unique_key pour la dédup, + filename/source désormais renseignés)
-        cur.execute(
-            'INSERT INTO "SourceDocument" (id, content, filename, source, created_at) '
-            'VALUES (gen_random_uuid(), %s, %s, %s, now()) RETURNING id',
-            (unique_key, result['filename'], result['source'])
-        )
+        # Vérifier si la colonne source_url existe (évite de planter si la migration n'a pas encore été appliquée)
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocument' AND column_name='source_url'""")
+        has_source_url = cur.fetchone() is not None  # NOUVEAU
+
+        if has_source_url:
+            cur.execute(
+                'INSERT INTO "SourceDocument" (id, content, filename, source, source_url, created_at) '
+                'VALUES (gen_random_uuid(), %s, %s, %s, %s, now()) RETURNING id',
+                (unique_key, result['filename'], result['source'], result.get('source_url'))
+            )
+        else:
+            cur.execute(
+                'INSERT INTO "SourceDocument" (id, content, filename, source, created_at) '
+                'VALUES (gen_random_uuid(), %s, %s, %s, now()) RETURNING id',
+                (unique_key, result['filename'], result['source'])
+            )
         doc_id = cur.fetchone()[0]
 
         # Vérifier si la colonne article_number existe
@@ -509,12 +542,19 @@ def process_and_insert(pdf_info, log_buf: deque):
     def log(msg):
         log_buf.append(msg)
 
+    # ✅ CRUCIAL : Annuler toute transaction en cours avant de faire quoi que ce soit
+    try:
+        conn.rollback()  # Assure que la connexion est dans un état propre
+    except:
+        pass
+
     # Vérifier si le document existe déjà
     try:
         cur = conn.cursor()
         cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (unique_key,))
         exists = cur.fetchone() is not None
         cur.close()
+        conn.commit()  # ✅ IMPORTANT : valider la transaction de lecture
 
         if exists and SKIP_EXISTING:
             log(f"⏭️ Déjà indexé: {unique_key[:60]}")
@@ -522,6 +562,7 @@ def process_and_insert(pdf_info, log_buf: deque):
             return True, 0, 'skipped'
     except Exception as e:
         log(f"⚠️ Erreur vérification: {e}")
+        conn.rollback()  # ✅ ANNULER en cas d'erreur
         return False, 0, 'error'
 
     try:
@@ -535,6 +576,7 @@ def process_and_insert(pdf_info, log_buf: deque):
         if error or not full_text:
             log(f"❌ {unique_key[:60]}: {error or 'Aucun texte'}")
             save_progress(unique_key, 'error')
+            conn.rollback()
             return False, 0, 'error'
 
         # Chunking
@@ -542,6 +584,7 @@ def process_and_insert(pdf_info, log_buf: deque):
         if not chunks_text:
             log(f"❌ {unique_key[:60]}: Aucun chunk créé")
             save_progress(unique_key, 'error')
+            conn.rollback()
             return False, 0, 'error'
 
         log(f"📝 {len(chunks_text)} chunks créés pour {unique_key[:40]}")
@@ -578,45 +621,57 @@ def process_and_insert(pdf_info, log_buf: deque):
             }
             chunks.append(chunk_data)
 
+        # 🔹 URL source (uniquement pour Luca Pacioli pour l'instant) — NOUVEAU
+        source_url = PACIOLI_URL_MAP.get(filename) if source == 'luca_pacioli' else None
+        if source == 'luca_pacioli' and not source_url:
+            log(f"⚠️ Pas d'URL trouvée dans {PACIOLI_URL_MAP_FILE} pour: {filename}")
+
+        # ✅ ICI : Définir result AVANT de l'utiliser
         result = {
             'filename': filename,
             'relative_path': relative_path,
             'source': source,
+            'source_url': source_url,   # NOUVEAU
             'num_pages': num_pages or 1,
             'chunks': chunks,
         }
 
-        # Insertion en base de données (chaque thread utilise SA propre connexion)
+        # Insertion en base de données
         inserted = insert_document(result)
 
         if inserted > 0:
             log(f"✅ [{source}] {relative_path[:50]} → {inserted} chunks")
             save_progress(unique_key, 'inserted')
+            conn.commit()  # ✅ VALIDER
             return True, inserted, 'inserted'
         else:
             log(f"⚠️ Aucun chunk inséré pour {unique_key[:50]}")
             save_progress(unique_key, 'no_chunks')
+            conn.rollback()  # ✅ ANNULER
             return False, 0, 'no_chunks'
 
     except TimeoutError:
         log(f"⏱️ Timeout: {unique_key[:60]}")
         save_progress(unique_key, 'timeout')
+        conn.rollback()
         return False, 0, 'timeout'
     except MemoryError:
         log(f"💾 Mémoire: {unique_key[:60]}")
         gc.collect()
         save_progress(unique_key, 'memory')
+        conn.rollback()
         return False, 0, 'memory'
     except Exception as e:
         log(f"❌ Erreur {unique_key[:60]}: {e}")
         import traceback
         traceback.print_exc()
         save_progress(unique_key, 'error')
+        conn.rollback()  # ✅ TOUJOURS ANNULER
         return False, 0, 'error'
 
 
 # ─────────────────────────────────────────────
-# FICHIERS — parcours des 2 dossiers
+# FICHIERS — parcours des 3 dossiers
 # ─────────────────────────────────────────────
 def get_pdf_files_recursive():
     out = []
@@ -689,13 +744,14 @@ def _render_log_block(log_buf: deque, width: int = 80):
 # ─────────────────────────────────────────────
 def index_documents():
     print("\n" + "=" * 60)
-    print("📚 INDEXATION JIBAYA + JORT")
+    print("📚 INDEXATION JIBAYA + JORT + LUCA PACIOLI")
     print("=" * 60)
     for name, folder in FOLDERS.items():
         ok = "✅" if os.path.exists(folder) else "❌"
-        print(f"  {ok} {name:<8} → {folder}")
+        print(f"  {ok} {name:<13} → {folder}")
     print(f"🔄 Workers: {PARALLEL_WORKERS}")
     print(f"⏱️  Timeout: Docling {DOCLING_TIMEOUT}s / global {PDF_EXTRACTION_TIMEOUT}s")
+    print(f"🔗 Mapping URL Pacioli: {len(PACIOLI_URL_MAP)} entrée(s) chargée(s)")
     print("=" * 60 + "\n")
 
     try:

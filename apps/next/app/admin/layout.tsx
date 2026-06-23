@@ -1,5 +1,4 @@
 "use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,10 +10,17 @@ import {
   ShieldCheck,
   Upload,
   Users,
+  Search,
+  Bell,
+  Mail,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MobileNav } from "@/components/admin/mobile-nav";
 
 const navigation = [
   {
@@ -74,54 +80,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Barre latérale */}
-      <aside className="flex w-56 flex-shrink-0 flex-col border-r bg-background">
-        {/* Logo */}
-        <div className="flex flex-col items-center border-b px-4 py-4">
-          <div className="flex items-center gap-2">
-            <div className="relative h-8 w-8">
-              <Image
-                src="/silkbot-logo.png"
-                alt="SilkBot Icon"
-                fill
-                className="object-contain"
-                priority
-                sizes="32px"
-              />
-            </div>
-            <div className="relative h-8 w-24">
-              <Image
-                src="/silkbot-black.png"
-                alt="SilkBot"
-                fill
-                className="object-contain dark:hidden"
-                priority
-                sizes="96px"
-              />
-              <Image
-                src="/silkbot-white.png"
-                alt="SilkBot"
-                fill
-                className="hidden object-contain dark:block"
-                priority
-                sizes="96px"
-              />
-            </div>
-          </div>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Administration
-          </p>
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="fixed top-0 left-0 w-64 bg-card border-r border-border p-4 h-screen overflow-y-auto hidden lg:block">
+        <div className="flex items-center gap-2 mb-6 group cursor-pointer">
+          <Link href="/" className="flex items-center gap-2">
+  <Image 
+    src="/silkbot-logo-dark.png"
+    alt="SilkBot"
+    width={32}
+    height={32}
+    className="rounded-lg"
+  />
+  <Image 
+    src="/silkbot-black.png"
+    alt="SilkBot"
+    width={90}
+    height={28}
+  />
+</Link>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-4">
           {navigation.map((group) => (
-            <div key={group.section} className="mb-5">
-              <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            <div key={group.section}>
+              <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wider">
                 {group.section}
               </p>
-              <div className="space-y-0.5">
+              <nav className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive =
                     item.href === "/admin"
@@ -132,27 +118,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-200",
+                        "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-300",
                         isActive
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                       )}
                     >
-                      <item.icon className={cn(
-                        "size-4 shrink-0",
-                        isActive && "text-primary"
-                      )} />
-                      {item.label}
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-sm">{item.label}</span>
                     </Link>
                   );
                 })}
-              </div>
+              </nav>
             </div>
           ))}
-        </nav>
+        </div>
 
-        {/* Pied de sidebar - Données utilisateur dynamiques */}
-        <div className="border-t px-3 py-3">
+        {/* Pied de sidebar */}
+        <div className="absolute bottom-4 left-4 right-4">
           {loading ? (
             <div className="mb-2 rounded-lg bg-muted/30 px-3 py-2">
               <div className="h-4 w-20 animate-pulse rounded bg-muted" />
@@ -171,17 +154,82 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all duration-300 hover:bg-destructive/10 hover:text-destructive hover:translate-x-1"
           >
-            <LogOut className="size-4 shrink-0" />
+            <LogOut className="w-4 h-4" />
             Déconnexion
           </button>
         </div>
       </aside>
 
       {/* Contenu principal */}
-      <main className="flex flex-1 flex-col overflow-hidden bg-background">
-        {children}
+      <main className="flex-1 p-3 md:p-4 lg:p-5 lg:ml-64">
+        {/* Header */}
+        <header className="space-y-3 md:space-y-4 animate-slide-in-up">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <MobileNav />
+
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher..."
+                  className="pl-9 pr-3 h-9 text-sm bg-card border-border transition-all duration-300 focus:shadow-lg focus:shadow-primary/10"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-secondary transition-all duration-300 hover:scale-110 h-8 w-8"
+                asChild
+              >
+                <Link href="/admin/messages">
+                  <Mail className="w-4 h-4" />
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-secondary transition-all duration-300 hover:scale-110 h-8 w-8"
+                asChild
+              >
+                <Link href="/admin/notifications">
+                  <Bell className="w-4 h-4" />
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-destructive rounded-full animate-pulse" />
+                </Link>
+              </Button>
+
+              <div className="flex items-center gap-2 pl-2 md:pl-3 border-l border-border">
+                <Avatar className="w-7 h-7 md:w-8 md:h-8 ring-2 ring-primary/20 transition-all duration-300 hover:ring-primary/40">
+                  <AvatarImage src="/profile.jpg" alt={user?.name || "Admin"} />
+                  <AvatarFallback className="text-xs">
+                    {user?.name?.charAt(0) || "A"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-xs hidden sm:block">
+                  <p className="font-semibold text-foreground">{user?.name || "Administrateur"}</p>
+                  <p className="text-muted-foreground text-[10px]">{user?.email || "admin@silkbot.com"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground mb-1">
+              Administration
+            </h1>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              Gérez la base documentaire et les comptes utilisateurs
+            </p>
+          </div>
+        </header>
+
+        <div className="mt-4 md:mt-5">
+          {children}
+        </div>
       </main>
     </div>
   );

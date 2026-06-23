@@ -20,9 +20,17 @@ type StoredMessage = {
 const DEFAULT_CHAT_TITLE = "Nouvelle conversation";
 const MAX_GENERATED_TITLE_LENGTH = 60;
 
+// ✅ CORRIGÉ : on exclut désormais explicitement les parts qui contiennent
+// les métadonnées RAG (<!--RAG:...-->), exactement comme le fait déjà
+// getMessageText() dans route.ts. Avant, cette fonction prenait juste le
+// PREMIER part de type 'text', ce qui ne fonctionnait que par chance
+// (parsed.answer est en position [0] dans route.ts). Si l'ordre des parts
+// changeait un jour, "content" en base et "lastMessage" dans la liste des
+// conversations afficheraient le JSON brut <!--RAG:{...}--> à l'utilisateur.
 function getMessageText(message: UIMessage): string {
   const textPart = message.parts?.find(
-    (part): part is { type: 'text'; text: string } => part.type === 'text'
+    (part): part is { type: 'text'; text: string } =>
+      part.type === 'text' && !part.text?.startsWith('<!--RAG:')
   );
   return textPart?.text || '';
 }
@@ -39,11 +47,24 @@ function getTitleFromFirstMessage(messages?: UIMessage[]): string | undefined {
   return `${text.slice(0, MAX_GENERATED_TITLE_LENGTH - 3).trimEnd()}...`;
 }
 
+// ✅ CORRIGÉ : validation du rôle au lieu d'un cast silencieux.
+// Avant : `msg.role as 'user' | 'assistant'` — si une valeur inattendue
+// était stockée en base (ex: 'system', ou une corruption de données),
+// le cast passait sans erreur et le bug se manifestait plus tard,
+// loin de sa cause réelle (ex: dans l'UI qui ne sait pas afficher un
+// rôle inconnu). Ici on log un avertissement et on retombe sur 'assistant'
+// par défaut plutôt que de propager silencieusement une valeur invalide.
+function normalizeRole(role: string): 'user' | 'assistant' {
+  if (role === 'user' || role === 'assistant') return role;
+  console.warn(`[chat-store] Rôle inattendu en base: "${role}" — traité comme "assistant"`);
+  return 'assistant';
+}
+
 function dbMessageToUIMessage(msg: StoredMessage): UIMessage {
   const parts = msg.parts ? JSON.parse(JSON.stringify(msg.parts)) as UIMessage['parts'] : [];
   return {
     id: msg.id,
-    role: msg.role as 'user' | 'assistant',
+    role: normalizeRole(msg.role),
     parts: parts,
   };
 }
@@ -98,7 +119,6 @@ export async function readChat(id: string): Promise<ChatWithMessages | null> {
   }
 }
 
-// ✅ userId ajouté
 export async function saveChat({
   chatId,
   messages,

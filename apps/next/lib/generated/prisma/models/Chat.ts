@@ -31,6 +31,7 @@ export type ChatMinAggregateOutputType = {
   createdAt: Date | null
   updatedAt: Date | null
   userId: string | null
+  isPinned: boolean | null
 }
 
 export type ChatMaxAggregateOutputType = {
@@ -40,6 +41,7 @@ export type ChatMaxAggregateOutputType = {
   createdAt: Date | null
   updatedAt: Date | null
   userId: string | null
+  isPinned: boolean | null
 }
 
 export type ChatCountAggregateOutputType = {
@@ -49,6 +51,7 @@ export type ChatCountAggregateOutputType = {
   createdAt: number
   updatedAt: number
   userId: number
+  isPinned: number
   _all: number
 }
 
@@ -60,6 +63,7 @@ export type ChatMinAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   userId?: true
+  isPinned?: true
 }
 
 export type ChatMaxAggregateInputType = {
@@ -69,6 +73,7 @@ export type ChatMaxAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   userId?: true
+  isPinned?: true
 }
 
 export type ChatCountAggregateInputType = {
@@ -78,6 +83,7 @@ export type ChatCountAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   userId?: true
+  isPinned?: true
   _all?: true
 }
 
@@ -160,6 +166,7 @@ export type ChatGroupByOutputType = {
   createdAt: Date
   updatedAt: Date
   userId: string | null
+  isPinned: boolean
   _count: ChatCountAggregateOutputType | null
   _min: ChatMinAggregateOutputType | null
   _max: ChatMaxAggregateOutputType | null
@@ -190,7 +197,9 @@ export type ChatWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   userId?: Prisma.StringNullableFilter<"Chat"> | string | null
+  isPinned?: Prisma.BoolFilter<"Chat"> | boolean
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
+  files?: Prisma.FileListRelationFilter
   messages?: Prisma.MessageListRelationFilter
 }
 
@@ -201,7 +210,9 @@ export type ChatOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
+  isPinned?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
+  files?: Prisma.FileOrderByRelationAggregateInput
   messages?: Prisma.MessageOrderByRelationAggregateInput
 }
 
@@ -215,7 +226,9 @@ export type ChatWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   userId?: Prisma.StringNullableFilter<"Chat"> | string | null
+  isPinned?: Prisma.BoolFilter<"Chat"> | boolean
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
+  files?: Prisma.FileListRelationFilter
   messages?: Prisma.MessageListRelationFilter
 }, "id">
 
@@ -226,6 +239,7 @@ export type ChatOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
+  isPinned?: Prisma.SortOrder
   _count?: Prisma.ChatCountOrderByAggregateInput
   _max?: Prisma.ChatMaxOrderByAggregateInput
   _min?: Prisma.ChatMinOrderByAggregateInput
@@ -241,6 +255,7 @@ export type ChatScalarWhereWithAggregatesInput = {
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Chat"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Chat"> | Date | string
   userId?: Prisma.StringNullableWithAggregatesFilter<"Chat"> | string | null
+  isPinned?: Prisma.BoolWithAggregatesFilter<"Chat"> | boolean
 }
 
 export type ChatCreateInput = {
@@ -249,7 +264,9 @@ export type ChatCreateInput = {
   activeStreamId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  isPinned?: boolean
   user?: Prisma.UserCreateNestedOneWithoutChatsInput
+  files?: Prisma.FileCreateNestedManyWithoutChatInput
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
 }
 
@@ -260,6 +277,8 @@ export type ChatUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   userId?: string | null
+  isPinned?: boolean
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutChatInput
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
 }
 
@@ -269,7 +288,9 @@ export type ChatUpdateInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutChatsNestedInput
+  files?: Prisma.FileUpdateManyWithoutChatNestedInput
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
 }
 
@@ -280,6 +301,8 @@ export type ChatUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  files?: Prisma.FileUncheckedUpdateManyWithoutChatNestedInput
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
 }
 
@@ -290,6 +313,7 @@ export type ChatCreateManyInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   userId?: string | null
+  isPinned?: boolean
 }
 
 export type ChatUpdateManyMutationInput = {
@@ -298,6 +322,7 @@ export type ChatUpdateManyMutationInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type ChatUncheckedUpdateManyInput = {
@@ -307,6 +332,7 @@ export type ChatUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type ChatListRelationFilter = {
@@ -326,6 +352,7 @@ export type ChatCountOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  isPinned?: Prisma.SortOrder
 }
 
 export type ChatMaxOrderByAggregateInput = {
@@ -335,6 +362,7 @@ export type ChatMaxOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  isPinned?: Prisma.SortOrder
 }
 
 export type ChatMinOrderByAggregateInput = {
@@ -344,11 +372,17 @@ export type ChatMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  isPinned?: Prisma.SortOrder
 }
 
 export type ChatScalarRelationFilter = {
   is?: Prisma.ChatWhereInput
   isNot?: Prisma.ChatWhereInput
+}
+
+export type ChatNullableScalarRelationFilter = {
+  is?: Prisma.ChatWhereInput | null
+  isNot?: Prisma.ChatWhereInput | null
 }
 
 export type ChatCreateNestedManyWithoutUserInput = {
@@ -407,12 +441,30 @@ export type ChatUpdateOneRequiredWithoutMessagesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ChatUpdateToOneWithWhereWithoutMessagesInput, Prisma.ChatUpdateWithoutMessagesInput>, Prisma.ChatUncheckedUpdateWithoutMessagesInput>
 }
 
+export type ChatCreateNestedOneWithoutFilesInput = {
+  create?: Prisma.XOR<Prisma.ChatCreateWithoutFilesInput, Prisma.ChatUncheckedCreateWithoutFilesInput>
+  connectOrCreate?: Prisma.ChatCreateOrConnectWithoutFilesInput
+  connect?: Prisma.ChatWhereUniqueInput
+}
+
+export type ChatUpdateOneWithoutFilesNestedInput = {
+  create?: Prisma.XOR<Prisma.ChatCreateWithoutFilesInput, Prisma.ChatUncheckedCreateWithoutFilesInput>
+  connectOrCreate?: Prisma.ChatCreateOrConnectWithoutFilesInput
+  upsert?: Prisma.ChatUpsertWithoutFilesInput
+  disconnect?: Prisma.ChatWhereInput | boolean
+  delete?: Prisma.ChatWhereInput | boolean
+  connect?: Prisma.ChatWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ChatUpdateToOneWithWhereWithoutFilesInput, Prisma.ChatUpdateWithoutFilesInput>, Prisma.ChatUncheckedUpdateWithoutFilesInput>
+}
+
 export type ChatCreateWithoutUserInput = {
   id?: string
   title?: string | null
   activeStreamId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  isPinned?: boolean
+  files?: Prisma.FileCreateNestedManyWithoutChatInput
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
 }
 
@@ -422,6 +474,8 @@ export type ChatUncheckedCreateWithoutUserInput = {
   activeStreamId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  isPinned?: boolean
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutChatInput
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
 }
 
@@ -461,6 +515,7 @@ export type ChatScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   userId?: Prisma.StringNullableFilter<"Chat"> | string | null
+  isPinned?: Prisma.BoolFilter<"Chat"> | boolean
 }
 
 export type ChatCreateWithoutMessagesInput = {
@@ -469,7 +524,9 @@ export type ChatCreateWithoutMessagesInput = {
   activeStreamId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  isPinned?: boolean
   user?: Prisma.UserCreateNestedOneWithoutChatsInput
+  files?: Prisma.FileCreateNestedManyWithoutChatInput
 }
 
 export type ChatUncheckedCreateWithoutMessagesInput = {
@@ -479,6 +536,8 @@ export type ChatUncheckedCreateWithoutMessagesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   userId?: string | null
+  isPinned?: boolean
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutChatInput
 }
 
 export type ChatCreateOrConnectWithoutMessagesInput = {
@@ -503,7 +562,9 @@ export type ChatUpdateWithoutMessagesInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutChatsNestedInput
+  files?: Prisma.FileUpdateManyWithoutChatNestedInput
 }
 
 export type ChatUncheckedUpdateWithoutMessagesInput = {
@@ -513,6 +574,68 @@ export type ChatUncheckedUpdateWithoutMessagesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  files?: Prisma.FileUncheckedUpdateManyWithoutChatNestedInput
+}
+
+export type ChatCreateWithoutFilesInput = {
+  id?: string
+  title?: string | null
+  activeStreamId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  isPinned?: boolean
+  user?: Prisma.UserCreateNestedOneWithoutChatsInput
+  messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+}
+
+export type ChatUncheckedCreateWithoutFilesInput = {
+  id?: string
+  title?: string | null
+  activeStreamId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  userId?: string | null
+  isPinned?: boolean
+  messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+}
+
+export type ChatCreateOrConnectWithoutFilesInput = {
+  where: Prisma.ChatWhereUniqueInput
+  create: Prisma.XOR<Prisma.ChatCreateWithoutFilesInput, Prisma.ChatUncheckedCreateWithoutFilesInput>
+}
+
+export type ChatUpsertWithoutFilesInput = {
+  update: Prisma.XOR<Prisma.ChatUpdateWithoutFilesInput, Prisma.ChatUncheckedUpdateWithoutFilesInput>
+  create: Prisma.XOR<Prisma.ChatCreateWithoutFilesInput, Prisma.ChatUncheckedCreateWithoutFilesInput>
+  where?: Prisma.ChatWhereInput
+}
+
+export type ChatUpdateToOneWithWhereWithoutFilesInput = {
+  where?: Prisma.ChatWhereInput
+  data: Prisma.XOR<Prisma.ChatUpdateWithoutFilesInput, Prisma.ChatUncheckedUpdateWithoutFilesInput>
+}
+
+export type ChatUpdateWithoutFilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  user?: Prisma.UserUpdateOneWithoutChatsNestedInput
+  messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+}
+
+export type ChatUncheckedUpdateWithoutFilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
 }
 
 export type ChatCreateManyUserInput = {
@@ -521,6 +644,7 @@ export type ChatCreateManyUserInput = {
   activeStreamId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  isPinned?: boolean
 }
 
 export type ChatUpdateWithoutUserInput = {
@@ -529,6 +653,8 @@ export type ChatUpdateWithoutUserInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  files?: Prisma.FileUpdateManyWithoutChatNestedInput
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
 }
 
@@ -538,6 +664,8 @@ export type ChatUncheckedUpdateWithoutUserInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  files?: Prisma.FileUncheckedUpdateManyWithoutChatNestedInput
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
 }
 
@@ -547,6 +675,7 @@ export type ChatUncheckedUpdateManyWithoutUserInput = {
   activeStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 
@@ -555,10 +684,12 @@ export type ChatUncheckedUpdateManyWithoutUserInput = {
  */
 
 export type ChatCountOutputType = {
+  files: number
   messages: number
 }
 
 export type ChatCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  files?: boolean | ChatCountOutputTypeCountFilesArgs
   messages?: boolean | ChatCountOutputTypeCountMessagesArgs
 }
 
@@ -570,6 +701,13 @@ export type ChatCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
    * Select specific fields to fetch from the ChatCountOutputType
    */
   select?: Prisma.ChatCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ChatCountOutputType without action
+ */
+export type ChatCountOutputTypeCountFilesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FileWhereInput
 }
 
 /**
@@ -587,7 +725,9 @@ export type ChatSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   updatedAt?: boolean
   userId?: boolean
+  isPinned?: boolean
   user?: boolean | Prisma.Chat$userArgs<ExtArgs>
+  files?: boolean | Prisma.Chat$filesArgs<ExtArgs>
   messages?: boolean | Prisma.Chat$messagesArgs<ExtArgs>
   _count?: boolean | Prisma.ChatCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["chat"]>
@@ -599,6 +739,7 @@ export type ChatSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   createdAt?: boolean
   updatedAt?: boolean
   userId?: boolean
+  isPinned?: boolean
   user?: boolean | Prisma.Chat$userArgs<ExtArgs>
 }, ExtArgs["result"]["chat"]>
 
@@ -609,6 +750,7 @@ export type ChatSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   createdAt?: boolean
   updatedAt?: boolean
   userId?: boolean
+  isPinned?: boolean
   user?: boolean | Prisma.Chat$userArgs<ExtArgs>
 }, ExtArgs["result"]["chat"]>
 
@@ -619,11 +761,13 @@ export type ChatSelectScalar = {
   createdAt?: boolean
   updatedAt?: boolean
   userId?: boolean
+  isPinned?: boolean
 }
 
-export type ChatOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "activeStreamId" | "createdAt" | "updatedAt" | "userId", ExtArgs["result"]["chat"]>
+export type ChatOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "activeStreamId" | "createdAt" | "updatedAt" | "userId" | "isPinned", ExtArgs["result"]["chat"]>
 export type ChatInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.Chat$userArgs<ExtArgs>
+  files?: boolean | Prisma.Chat$filesArgs<ExtArgs>
   messages?: boolean | Prisma.Chat$messagesArgs<ExtArgs>
   _count?: boolean | Prisma.ChatCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -638,6 +782,7 @@ export type $ChatPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "Chat"
   objects: {
     user: Prisma.$UserPayload<ExtArgs> | null
+    files: Prisma.$FilePayload<ExtArgs>[]
     messages: Prisma.$MessagePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -647,6 +792,7 @@ export type $ChatPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     createdAt: Date
     updatedAt: Date
     userId: string | null
+    isPinned: boolean
   }, ExtArgs["result"]["chat"]>
   composites: {}
 }
@@ -1042,6 +1188,7 @@ readonly fields: ChatFieldRefs;
 export interface Prisma__ChatClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.Chat$userArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$userArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  files<T extends Prisma.Chat$filesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$filesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   messages<T extends Prisma.Chat$messagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1078,6 +1225,7 @@ export interface ChatFieldRefs {
   readonly createdAt: Prisma.FieldRef<"Chat", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Chat", 'DateTime'>
   readonly userId: Prisma.FieldRef<"Chat", 'String'>
+  readonly isPinned: Prisma.FieldRef<"Chat", 'Boolean'>
 }
     
 
@@ -1495,6 +1643,30 @@ export type Chat$userArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs 
    */
   include?: Prisma.UserInclude<ExtArgs> | null
   where?: Prisma.UserWhereInput
+}
+
+/**
+ * Chat.files
+ */
+export type Chat$filesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the File
+   */
+  select?: Prisma.FileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the File
+   */
+  omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  where?: Prisma.FileWhereInput
+  orderBy?: Prisma.FileOrderByWithRelationInput | Prisma.FileOrderByWithRelationInput[]
+  cursor?: Prisma.FileWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FileScalarFieldEnum | Prisma.FileScalarFieldEnum[]
 }
 
 /**

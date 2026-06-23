@@ -37,6 +37,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { 
+  fetchDocuments as fetchDocumentsApi, 
+  deleteDocument as deleteDocumentApi, 
+  fetchDocumentSegments as fetchDocumentSegmentsApi 
+} from "@/lib/api/admin";
 
 type DocumentItem = {
   id: string;
@@ -128,14 +133,12 @@ export default function AdminDocumentsPage() {
 
   useEffect(() => () => { if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current); }, []);
 
-  const fetchDocuments = useCallback(
+  const loadDocuments = useCallback(
     async (silent = false) => {
       silent ? setRefreshing(true) : setLoading(true);
       try {
-        const res = await fetch("/api/admin/document-ref");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
-        setDocuments(Array.isArray(data) ? data : data.documents ?? []);
+        const data = await fetchDocumentsApi();
+        setDocuments(data);
         setCurrentPage(1);
       } catch (err) {
         showNotice(err instanceof Error ? err.message : "Erreur de chargement", "error");
@@ -147,7 +150,7 @@ export default function AdminDocumentsPage() {
     [showNotice],
   );
 
-  useEffect(() => { void fetchDocuments(); }, [fetchDocuments]);
+  useEffect(() => { void loadDocuments(); }, [loadDocuments]);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -168,14 +171,12 @@ export default function AdminDocumentsPage() {
 
   useEffect(() => { setCurrentPage(1); }, [query, filter]);
 
-  // Fonction pour fermer le panneau des segments
   const closeSegments = useCallback(() => {
     setSelectedDocument(null);
     setSegments([]);
     setSegmentError(null);
   }, []);
 
-  // Fonction pour ouvrir les segments d'un document
   const openSegments = useCallback(async (doc: DocumentItem) => {
     setSelectedDocument(doc);
     setSegments([]);
@@ -183,21 +184,11 @@ export default function AdminDocumentsPage() {
     setSegmentError(null);
 
     try {
-      const res = await fetch(`/api/admin/document-ref/${doc.id}/segments`);
-      const text = await res.text();
-      if (!text.trim()) {
-        setSegmentError("Aucune donnée retournée par l'API");
-        return;
+      const data = await fetchDocumentSegmentsApi(doc.id);
+      setSegments(data.segments);
+      if (data.segments.length === 0) {
+        setSegmentError("Aucun segment disponible pour ce document");
       }
-      const data = JSON.parse(text);
-      if (!res.ok) {
-        setSegmentError(data.error ?? `Erreur ${res.status}`);
-        return;
-      }
-      const list: string[] =
-        data.segments ?? (Array.isArray(data) ? data : data.data ?? []);
-      setSegments(list);
-      if (list.length === 0) setSegmentError("Aucun segment disponible pour ce document");
     } catch (err) {
       setSegmentError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -205,17 +196,11 @@ export default function AdminDocumentsPage() {
     }
   }, []);
 
-  const deleteDocument = async (doc: DocumentItem) => {
+  const handleDeleteDocument = async (doc: DocumentItem) => {
     if (!confirm(`Supprimer "${doc.filename}" et ses ${doc.segmentCount} segments ?`)) return;
     setDeletingId(doc.id);
     try {
-      const res = await fetch("/api/admin/document-ref", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: doc.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Suppression impossible");
+      await deleteDocumentApi(doc.id);
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
       if (selectedDocument?.id === doc.id) {
         closeSegments();
@@ -257,8 +242,7 @@ export default function AdminDocumentsPage() {
         </div>
       )}
 
-      {/* En-tête */}
-      <header className="flex items-center justify-between border-b bg-background px-6 py-4">
+      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
         <div>
           <h1 className="text-base font-medium">Documents indexés</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -269,7 +253,7 @@ export default function AdminDocumentsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchDocuments(true)}
+            onClick={() => loadDocuments(true)}
             disabled={refreshing}
           >
             <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
@@ -277,20 +261,18 @@ export default function AdminDocumentsPage() {
           </Button>
           <Button size="sm" asChild>
             <Link href="/admin/documents/upload">
-              <Upload className="size-3.5" />
+              <Upload className="size-3.5 mr-1.5" />
               Importer
             </Link>
           </Button>
         </div>
-      </header>
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Colonne principale */}
         <div className={cn(
           "flex flex-1 flex-col gap-5 overflow-y-auto p-6 transition-all duration-300",
           selectedDocument ? "xl:pr-2" : ""
         )}>
-          {/* Liste des documents */}
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">Sources disponibles</CardTitle>
@@ -299,7 +281,6 @@ export default function AdminDocumentsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Filtres */}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -313,7 +294,7 @@ export default function AdminDocumentsPage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="shrink-0">
-                      <Filter className="size-3.5" />
+                      <Filter className="size-3.5 mr-1" />
                       {filter === "all" ? "Tous" : filter === "pdf" ? "PDF" : "Texte"}
                     </Button>
                   </DropdownMenuTrigger>
@@ -327,7 +308,6 @@ export default function AdminDocumentsPage() {
                 </DropdownMenu>
               </div>
 
-              {/* Tableau */}
               <div className="overflow-hidden rounded-lg border">
                 <div className="hidden grid-cols-[1fr_80px_70px_90px_36px] border-b bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
                   <span>Document</span>
@@ -402,18 +382,18 @@ export default function AdminDocumentsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
                             <DropdownMenuItem onClick={() => void openSegments(doc)}>
-                              <Eye className="size-4" /> Voir les segments
+                              <Eye className="size-4 mr-2" /> Voir les segments
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => void copyId(doc.id)}>
-                              <Copy className="size-4" /> Copier l'identifiant
+                              <Copy className="size-4 mr-2" /> Copier l'identifiant
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               variant="destructive"
                               disabled={deletingId === doc.id}
-                              onClick={() => void deleteDocument(doc)}
+                              onClick={() => void handleDeleteDocument(doc)}
                             >
-                              <Trash2 className="size-4" /> Supprimer
+                              <Trash2 className="size-4 mr-2" /> Supprimer
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -423,7 +403,6 @@ export default function AdminDocumentsPage() {
                 )}
               </div>
 
-              {/* Pagination */}
               {!loading && totalPages > 1 && (
                 <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
                   <span>
@@ -455,7 +434,6 @@ export default function AdminDocumentsPage() {
           </Card>
         </div>
 
-        {/* Panneau aperçu segments (visible uniquement quand un document est sélectionné) */}
         {selectedDocument && (
           <aside className="w-80 flex-shrink-0 border-l animate-in slide-in-from-right duration-300 xl:flex xl:flex-col">
             <div className="flex items-center justify-between border-b px-4 py-3">

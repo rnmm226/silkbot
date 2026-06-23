@@ -1,10 +1,10 @@
 // app/api/chat/gemini-tools.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { RagChunk, SearchResponse } from './types';
-import { 
-  semantic_search, 
-  article_search, 
-  tag_search, 
+import {
+  semantic_search,
+  article_search,
+  tag_search,
   document_search,
   get_document,
   get_page,
@@ -16,7 +16,17 @@ const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_GENERATIVE_AI_API_KEY!
 );
 
-// ✅ Version corrigée avec SchemaType correct
+// ✅ Modèle aligné avec le premier modèle de la cascade de llm.ts
+// (gemini-2.5-flash). Avant : "gemini-2.0-flash" en dur, sans fallback —
+// donc si ce modèle précis était en quota dépassé, decideToolsWithGemini
+// utilisait son fallback interne (smart_search) à chaque fois, même si
+// gemini-2.5-flash ou un autre modèle de la cascade était disponible.
+const TOOL_DECISION_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+];
+
 export const GEMINI_TOOLS = [
   {
     name: "semantic_search",
@@ -109,9 +119,11 @@ export async function executeGeminiTool(
   return executor(args);
 }
 
-export function getGeminiModelWithTools() {
+// ✅ Accepte maintenant un nom de modèle, pour pouvoir essayer
+// la cascade complète dans decideToolsWithGemini.
+function getGeminiModelWithTools(modelName: string) {
   return genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: modelName,
     tools: [
       {
         functionDeclarations: GEMINI_TOOLS,
@@ -120,12 +132,25 @@ export function getGeminiModelWithTools() {
   });
 }
 
+function isRetryableError(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  return (
+    msg.includes('503') ||
+    msg.includes('overloaded') ||
+    msg.includes('high demand') ||
+    msg.includes('quota') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('Service Unavailable') ||
+    msg.includes('429') ||
+    msg.includes('Too Many Requests')
+  );
+}
+
 export async function decideToolsWithGemini(
   question: string,
   context?: string
 ): Promise<{ toolCalls: Array<{ name: string; args: any }>; reasoning: string }> {
-  const model = getGeminiModelWithTools();
-  
+
   const prompt = `
 Tu es un agent juridique tunisien expert. Analyse la question et décide quels outils utiliser.
 
@@ -134,24 +159,42 @@ ${context ? `CONTEXTE: ${context}` : ''}
 
 Utilise UNIQUEMENT les outils disponibles.`;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const functionCalls = response.functionCalls();
-    
-    if (functionCalls && functionCalls.length > 0) {
-      return {
-        toolCalls: functionCalls.map(call => ({
-          name: call.name,
-          args: call.args,
-        })),
-        reasoning: "Gemini a décidé d'utiliser les outils suivants",
-      };
+  // ✅ On essaie chaque modèle de la cascade avant de tomber sur le
+  // fallback générique (smart_search). Avant : un seul modèle fixe,
+  // aucun essai d'un modèle de remplacement en cas de 429/503.
+  for (const modelName of TOOL_DECISION_MODELS) {
+    try {
+      console.log(`[Gemini] Tentative de décision d'outils avec ${modelName}`);
+      const model = getGeminiModelWithTools(modelName);
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const functionCalls = response.functionCalls();
+
+      if (functionCalls && functionCalls.length > 0) {
+        console.log(`[Gemini] ✅ Décision obtenue avec ${modelName}`);
+        return {
+          toolCalls: functionCalls.map(call => ({
+            name: call.name,
+            args: call.args,
+          })),
+          reasoning: `Gemini (${modelName}) a décidé d'utiliser les outils suivants`,
+        };
+      }
+
+      // Le modèle a répondu mais sans appel d'outil : pas la peine
+      // d'essayer un autre modèle, on passe directement au fallback.
+      console.warn(`[Gemini] ${modelName} n'a renvoyé aucun appel d'outil`);
+      break;
+    } catch (error) {
+      if (isRetryableError(error)) {
+        console.warn(`[Gemini] ⚠️ ${modelName} indisponible, tentative suivante:`, (error as Error).message);
+        continue;
+      }
+      console.error(`[Gemini] ❌ Erreur non récupérable avec ${modelName}:`, error);
+      break;
     }
-  } catch (error) {
-    console.error('[Gemini] Erreur:', error);
   }
-  
+
   return {
     toolCalls: [{ name: 'smart_search', args: { query: question } }],
     reasoning: 'Fallback: utilisation de smart_search',
@@ -162,7 +205,7 @@ export async function executeGeminiDecisions(
   toolCalls: Array<{ name: string; args: any }>
 ): Promise<SearchResponse> {
   const allResults: RagChunk[] = [];
-  
+
   for (const call of toolCalls) {
     try {
       console.log(`[Gemini] Exécution de ${call.name}`);
@@ -172,13 +215,13 @@ export async function executeGeminiDecisions(
       console.error(`[Gemini] Erreur pour ${call.name}:`, error);
     }
   }
-  
+
   const uniqueChunks = allResults.filter(
     (chunk, index, self) =>
       index === self.findIndex(c => c.chunk_id === chunk.chunk_id)
   );
-  
+
   uniqueChunks.sort((a, b) => b.similarity - a.similarity);
-  
+
   return { chunks: uniqueChunks.slice(0, 20) };
 }

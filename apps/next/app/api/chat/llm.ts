@@ -5,13 +5,32 @@ const genAI = new GoogleGenerativeAI(
   process.env.GOOGLE_GENERATIVE_AI_API_KEY!
 );
 
-const MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-];
 
+// Ajoutez ceci au niveau supérieur du fichier, après genAI
+async function listAvailableModels() {
+  try {
+    const result = await genAI.listModels();
+    console.log('[LLM] 📋 Modèles disponibles:');
+    result.models.forEach(model => {
+      console.log(`  - ${model.name} (${model.supportedGenerationMethods?.join(', ')})`);
+    });
+  } catch (err) {
+    console.error('[LLM] ❌ Impossible de lister les modèles:', err);
+  }
+}
+
+// Appelez-la une fois au démarrage
+listAvailableModels();
+// Ajoutez ce log temporairement
+console.log('[LLM] Clé API présente ?', !!process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+console.log('[LLM] Clé API début:', process.env.GOOGLE_GENERATIVE_AI_API_KEY?.substring(0, 10));
+
+const MODELS = [
+  'gemini-2.0-flash-exp',        // Modèle expérimental
+  'gemini-1.5-flash-001',        // Nom exact
+  'gemini-1.5-pro-001',          // Nom exact
+  'gemini-2.5-flash-preview-04-2025', // Preview
+];
 function isRetryableError(err: any): boolean {
   const msg = String(err?.message || err || '');
   return (

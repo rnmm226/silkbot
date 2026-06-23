@@ -27,19 +27,28 @@ export type AggregateSourceDocument = {
 export type SourceDocumentMinAggregateOutputType = {
   id: string | null
   content: string | null
-  createdAt: Date | null
+  filename: string | null
+  source: string | null
+  created_at: Date | null
+  source_url: string | null
 }
 
 export type SourceDocumentMaxAggregateOutputType = {
   id: string | null
   content: string | null
-  createdAt: Date | null
+  filename: string | null
+  source: string | null
+  created_at: Date | null
+  source_url: string | null
 }
 
 export type SourceDocumentCountAggregateOutputType = {
   id: number
   content: number
-  createdAt: number
+  filename: number
+  source: number
+  created_at: number
+  source_url: number
   _all: number
 }
 
@@ -47,19 +56,28 @@ export type SourceDocumentCountAggregateOutputType = {
 export type SourceDocumentMinAggregateInputType = {
   id?: true
   content?: true
-  createdAt?: true
+  filename?: true
+  source?: true
+  created_at?: true
+  source_url?: true
 }
 
 export type SourceDocumentMaxAggregateInputType = {
   id?: true
   content?: true
-  createdAt?: true
+  filename?: true
+  source?: true
+  created_at?: true
+  source_url?: true
 }
 
 export type SourceDocumentCountAggregateInputType = {
   id?: true
   content?: true
-  createdAt?: true
+  filename?: true
+  source?: true
+  created_at?: true
+  source_url?: true
   _all?: true
 }
 
@@ -137,8 +155,11 @@ export type SourceDocumentGroupByArgs<ExtArgs extends runtime.Types.Extensions.I
 
 export type SourceDocumentGroupByOutputType = {
   id: string
-  content: string | null
-  createdAt: Date
+  content: string
+  filename: string
+  source: string
+  created_at: Date | null
+  source_url: string | null
   _count: SourceDocumentCountAggregateOutputType | null
   _min: SourceDocumentMinAggregateOutputType | null
   _max: SourceDocumentMaxAggregateOutputType | null
@@ -163,33 +184,45 @@ export type SourceDocumentWhereInput = {
   AND?: Prisma.SourceDocumentWhereInput | Prisma.SourceDocumentWhereInput[]
   OR?: Prisma.SourceDocumentWhereInput[]
   NOT?: Prisma.SourceDocumentWhereInput | Prisma.SourceDocumentWhereInput[]
-  id?: Prisma.StringFilter<"SourceDocument"> | string
-  content?: Prisma.StringNullableFilter<"SourceDocument"> | string | null
-  createdAt?: Prisma.DateTimeFilter<"SourceDocument"> | Date | string
-  segments?: Prisma.SourceDocumentSegmentListRelationFilter
+  id?: Prisma.UuidFilter<"SourceDocument"> | string
+  content?: Prisma.StringFilter<"SourceDocument"> | string
+  filename?: Prisma.StringFilter<"SourceDocument"> | string
+  source?: Prisma.StringFilter<"SourceDocument"> | string
+  created_at?: Prisma.DateTimeNullableFilter<"SourceDocument"> | Date | string | null
+  source_url?: Prisma.StringNullableFilter<"SourceDocument"> | string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentListRelationFilter
 }
 
 export type SourceDocumentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  content?: Prisma.SortOrderInput | Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
-  segments?: Prisma.SourceDocumentSegmentOrderByRelationAggregateInput
+  content?: Prisma.SortOrder
+  filename?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  created_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  source_url?: Prisma.SortOrderInput | Prisma.SortOrder
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentOrderByRelationAggregateInput
 }
 
 export type SourceDocumentWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  content?: string
   AND?: Prisma.SourceDocumentWhereInput | Prisma.SourceDocumentWhereInput[]
   OR?: Prisma.SourceDocumentWhereInput[]
   NOT?: Prisma.SourceDocumentWhereInput | Prisma.SourceDocumentWhereInput[]
-  content?: Prisma.StringNullableFilter<"SourceDocument"> | string | null
-  createdAt?: Prisma.DateTimeFilter<"SourceDocument"> | Date | string
-  segments?: Prisma.SourceDocumentSegmentListRelationFilter
-}, "id">
+  filename?: Prisma.StringFilter<"SourceDocument"> | string
+  source?: Prisma.StringFilter<"SourceDocument"> | string
+  created_at?: Prisma.DateTimeNullableFilter<"SourceDocument"> | Date | string | null
+  source_url?: Prisma.StringNullableFilter<"SourceDocument"> | string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentListRelationFilter
+}, "id" | "content">
 
 export type SourceDocumentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  content?: Prisma.SortOrderInput | Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
+  content?: Prisma.SortOrder
+  filename?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  created_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  source_url?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.SourceDocumentCountOrderByAggregateInput
   _max?: Prisma.SourceDocumentMaxOrderByAggregateInput
   _min?: Prisma.SourceDocumentMinOrderByAggregateInput
@@ -199,134 +232,171 @@ export type SourceDocumentScalarWhereWithAggregatesInput = {
   AND?: Prisma.SourceDocumentScalarWhereWithAggregatesInput | Prisma.SourceDocumentScalarWhereWithAggregatesInput[]
   OR?: Prisma.SourceDocumentScalarWhereWithAggregatesInput[]
   NOT?: Prisma.SourceDocumentScalarWhereWithAggregatesInput | Prisma.SourceDocumentScalarWhereWithAggregatesInput[]
-  id?: Prisma.StringWithAggregatesFilter<"SourceDocument"> | string
-  content?: Prisma.StringNullableWithAggregatesFilter<"SourceDocument"> | string | null
-  createdAt?: Prisma.DateTimeWithAggregatesFilter<"SourceDocument"> | Date | string
+  id?: Prisma.UuidWithAggregatesFilter<"SourceDocument"> | string
+  content?: Prisma.StringWithAggregatesFilter<"SourceDocument"> | string
+  filename?: Prisma.StringWithAggregatesFilter<"SourceDocument"> | string
+  source?: Prisma.StringWithAggregatesFilter<"SourceDocument"> | string
+  created_at?: Prisma.DateTimeNullableWithAggregatesFilter<"SourceDocument"> | Date | string | null
+  source_url?: Prisma.StringNullableWithAggregatesFilter<"SourceDocument"> | string | null
 }
 
 export type SourceDocumentCreateInput = {
   id?: string
-  content?: string | null
-  createdAt?: Date | string
-  segments?: Prisma.SourceDocumentSegmentCreateNestedManyWithoutSourceDocumentInput
+  content: string
+  filename: string
+  source: string
+  created_at?: Date | string | null
+  source_url?: string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentCreateNestedManyWithoutSourceDocumentInput
 }
 
 export type SourceDocumentUncheckedCreateInput = {
   id?: string
-  content?: string | null
-  createdAt?: Date | string
-  segments?: Prisma.SourceDocumentSegmentUncheckedCreateNestedManyWithoutSourceDocumentInput
+  content: string
+  filename: string
+  source: string
+  created_at?: Date | string | null
+  source_url?: string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentUncheckedCreateNestedManyWithoutSourceDocumentInput
 }
 
 export type SourceDocumentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  segments?: Prisma.SourceDocumentSegmentUpdateManyWithoutSourceDocumentNestedInput
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentUpdateManyWithoutSourceDocumentNestedInput
 }
 
 export type SourceDocumentUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  segments?: Prisma.SourceDocumentSegmentUncheckedUpdateManyWithoutSourceDocumentNestedInput
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  SourceDocumentSegment?: Prisma.SourceDocumentSegmentUncheckedUpdateManyWithoutSourceDocumentNestedInput
 }
 
 export type SourceDocumentCreateManyInput = {
   id?: string
-  content?: string | null
-  createdAt?: Date | string
+  content: string
+  filename: string
+  source: string
+  created_at?: Date | string | null
+  source_url?: string | null
 }
 
 export type SourceDocumentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type SourceDocumentUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type SourceDocumentCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
+  filename?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  created_at?: Prisma.SortOrder
+  source_url?: Prisma.SortOrder
 }
 
 export type SourceDocumentMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
+  filename?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  created_at?: Prisma.SortOrder
+  source_url?: Prisma.SortOrder
 }
 
 export type SourceDocumentMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   content?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
+  filename?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  created_at?: Prisma.SortOrder
+  source_url?: Prisma.SortOrder
 }
 
-export type SourceDocumentNullableScalarRelationFilter = {
-  is?: Prisma.SourceDocumentWhereInput | null
-  isNot?: Prisma.SourceDocumentWhereInput | null
+export type SourceDocumentScalarRelationFilter = {
+  is?: Prisma.SourceDocumentWhereInput
+  isNot?: Prisma.SourceDocumentWhereInput
 }
 
-export type SourceDocumentCreateNestedOneWithoutSegmentsInput = {
-  create?: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedCreateWithoutSegmentsInput>
-  connectOrCreate?: Prisma.SourceDocumentCreateOrConnectWithoutSegmentsInput
+export type SourceDocumentUpdateOneRequiredWithoutSourceDocumentSegmentNestedInput = {
+  create?: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUncheckedCreateWithoutSourceDocumentSegmentInput>
+  connectOrCreate?: Prisma.SourceDocumentCreateOrConnectWithoutSourceDocumentSegmentInput
+  upsert?: Prisma.SourceDocumentUpsertWithoutSourceDocumentSegmentInput
   connect?: Prisma.SourceDocumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SourceDocumentUpdateToOneWithWhereWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUpdateWithoutSourceDocumentSegmentInput>, Prisma.SourceDocumentUncheckedUpdateWithoutSourceDocumentSegmentInput>
 }
 
-export type SourceDocumentUpdateOneWithoutSegmentsNestedInput = {
-  create?: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedCreateWithoutSegmentsInput>
-  connectOrCreate?: Prisma.SourceDocumentCreateOrConnectWithoutSegmentsInput
-  upsert?: Prisma.SourceDocumentUpsertWithoutSegmentsInput
-  disconnect?: Prisma.SourceDocumentWhereInput | boolean
-  delete?: Prisma.SourceDocumentWhereInput | boolean
-  connect?: Prisma.SourceDocumentWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.SourceDocumentUpdateToOneWithWhereWithoutSegmentsInput, Prisma.SourceDocumentUpdateWithoutSegmentsInput>, Prisma.SourceDocumentUncheckedUpdateWithoutSegmentsInput>
-}
-
-export type SourceDocumentCreateWithoutSegmentsInput = {
+export type SourceDocumentCreateWithoutSourceDocumentSegmentInput = {
   id?: string
-  content?: string | null
-  createdAt?: Date | string
+  content: string
+  filename: string
+  source: string
+  created_at?: Date | string | null
+  source_url?: string | null
 }
 
-export type SourceDocumentUncheckedCreateWithoutSegmentsInput = {
+export type SourceDocumentUncheckedCreateWithoutSourceDocumentSegmentInput = {
   id?: string
-  content?: string | null
-  createdAt?: Date | string
+  content: string
+  filename: string
+  source: string
+  created_at?: Date | string | null
+  source_url?: string | null
 }
 
-export type SourceDocumentCreateOrConnectWithoutSegmentsInput = {
+export type SourceDocumentCreateOrConnectWithoutSourceDocumentSegmentInput = {
   where: Prisma.SourceDocumentWhereUniqueInput
-  create: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedCreateWithoutSegmentsInput>
+  create: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUncheckedCreateWithoutSourceDocumentSegmentInput>
 }
 
-export type SourceDocumentUpsertWithoutSegmentsInput = {
-  update: Prisma.XOR<Prisma.SourceDocumentUpdateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedUpdateWithoutSegmentsInput>
-  create: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedCreateWithoutSegmentsInput>
+export type SourceDocumentUpsertWithoutSourceDocumentSegmentInput = {
+  update: Prisma.XOR<Prisma.SourceDocumentUpdateWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUncheckedUpdateWithoutSourceDocumentSegmentInput>
+  create: Prisma.XOR<Prisma.SourceDocumentCreateWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUncheckedCreateWithoutSourceDocumentSegmentInput>
   where?: Prisma.SourceDocumentWhereInput
 }
 
-export type SourceDocumentUpdateToOneWithWhereWithoutSegmentsInput = {
+export type SourceDocumentUpdateToOneWithWhereWithoutSourceDocumentSegmentInput = {
   where?: Prisma.SourceDocumentWhereInput
-  data: Prisma.XOR<Prisma.SourceDocumentUpdateWithoutSegmentsInput, Prisma.SourceDocumentUncheckedUpdateWithoutSegmentsInput>
+  data: Prisma.XOR<Prisma.SourceDocumentUpdateWithoutSourceDocumentSegmentInput, Prisma.SourceDocumentUncheckedUpdateWithoutSourceDocumentSegmentInput>
 }
 
-export type SourceDocumentUpdateWithoutSegmentsInput = {
+export type SourceDocumentUpdateWithoutSourceDocumentSegmentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
-export type SourceDocumentUncheckedUpdateWithoutSegmentsInput = {
+export type SourceDocumentUncheckedUpdateWithoutSourceDocumentSegmentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  content?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  filename?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  source_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -335,11 +405,11 @@ export type SourceDocumentUncheckedUpdateWithoutSegmentsInput = {
  */
 
 export type SourceDocumentCountOutputType = {
-  segments: number
+  SourceDocumentSegment: number
 }
 
 export type SourceDocumentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  segments?: boolean | SourceDocumentCountOutputTypeCountSegmentsArgs
+  SourceDocumentSegment?: boolean | SourceDocumentCountOutputTypeCountSourceDocumentSegmentArgs
 }
 
 /**
@@ -355,7 +425,7 @@ export type SourceDocumentCountOutputTypeDefaultArgs<ExtArgs extends runtime.Typ
 /**
  * SourceDocumentCountOutputType without action
  */
-export type SourceDocumentCountOutputTypeCountSegmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type SourceDocumentCountOutputTypeCountSourceDocumentSegmentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.SourceDocumentSegmentWhereInput
 }
 
@@ -363,32 +433,44 @@ export type SourceDocumentCountOutputTypeCountSegmentsArgs<ExtArgs extends runti
 export type SourceDocumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   content?: boolean
-  createdAt?: boolean
-  segments?: boolean | Prisma.SourceDocument$segmentsArgs<ExtArgs>
+  filename?: boolean
+  source?: boolean
+  created_at?: boolean
+  source_url?: boolean
+  SourceDocumentSegment?: boolean | Prisma.SourceDocument$SourceDocumentSegmentArgs<ExtArgs>
   _count?: boolean | Prisma.SourceDocumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["sourceDocument"]>
 
 export type SourceDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   content?: boolean
-  createdAt?: boolean
+  filename?: boolean
+  source?: boolean
+  created_at?: boolean
+  source_url?: boolean
 }, ExtArgs["result"]["sourceDocument"]>
 
 export type SourceDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   content?: boolean
-  createdAt?: boolean
+  filename?: boolean
+  source?: boolean
+  created_at?: boolean
+  source_url?: boolean
 }, ExtArgs["result"]["sourceDocument"]>
 
 export type SourceDocumentSelectScalar = {
   id?: boolean
   content?: boolean
-  createdAt?: boolean
+  filename?: boolean
+  source?: boolean
+  created_at?: boolean
+  source_url?: boolean
 }
 
-export type SourceDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "createdAt", ExtArgs["result"]["sourceDocument"]>
+export type SourceDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "content" | "filename" | "source" | "created_at" | "source_url", ExtArgs["result"]["sourceDocument"]>
 export type SourceDocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  segments?: boolean | Prisma.SourceDocument$segmentsArgs<ExtArgs>
+  SourceDocumentSegment?: boolean | Prisma.SourceDocument$SourceDocumentSegmentArgs<ExtArgs>
   _count?: boolean | Prisma.SourceDocumentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SourceDocumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -397,12 +479,15 @@ export type SourceDocumentIncludeUpdateManyAndReturn<ExtArgs extends runtime.Typ
 export type $SourceDocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "SourceDocument"
   objects: {
-    segments: Prisma.$SourceDocumentSegmentPayload<ExtArgs>[]
+    SourceDocumentSegment: Prisma.$SourceDocumentSegmentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    content: string | null
-    createdAt: Date
+    content: string
+    filename: string
+    source: string
+    created_at: Date | null
+    source_url: string | null
   }, ExtArgs["result"]["sourceDocument"]>
   composites: {}
 }
@@ -797,7 +882,7 @@ readonly fields: SourceDocumentFieldRefs;
  */
 export interface Prisma__SourceDocumentClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  segments<T extends Prisma.SourceDocument$segmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SourceDocument$segmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SourceDocumentSegmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  SourceDocumentSegment<T extends Prisma.SourceDocument$SourceDocumentSegmentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SourceDocument$SourceDocumentSegmentArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SourceDocumentSegmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -829,7 +914,10 @@ export interface Prisma__SourceDocumentClient<T, Null = never, ExtArgs extends r
 export interface SourceDocumentFieldRefs {
   readonly id: Prisma.FieldRef<"SourceDocument", 'String'>
   readonly content: Prisma.FieldRef<"SourceDocument", 'String'>
-  readonly createdAt: Prisma.FieldRef<"SourceDocument", 'DateTime'>
+  readonly filename: Prisma.FieldRef<"SourceDocument", 'String'>
+  readonly source: Prisma.FieldRef<"SourceDocument", 'String'>
+  readonly created_at: Prisma.FieldRef<"SourceDocument", 'DateTime'>
+  readonly source_url: Prisma.FieldRef<"SourceDocument", 'String'>
 }
     
 
@@ -1053,7 +1141,7 @@ export type SourceDocumentCreateArgs<ExtArgs extends runtime.Types.Extensions.In
   /**
    * The data needed to create a SourceDocument.
    */
-  data?: Prisma.XOR<Prisma.SourceDocumentCreateInput, Prisma.SourceDocumentUncheckedCreateInput>
+  data: Prisma.XOR<Prisma.SourceDocumentCreateInput, Prisma.SourceDocumentUncheckedCreateInput>
 }
 
 /**
@@ -1223,9 +1311,9 @@ export type SourceDocumentDeleteManyArgs<ExtArgs extends runtime.Types.Extension
 }
 
 /**
- * SourceDocument.segments
+ * SourceDocument.SourceDocumentSegment
  */
-export type SourceDocument$segmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type SourceDocument$SourceDocumentSegmentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the SourceDocumentSegment
    */

@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -16,30 +15,29 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  banExpires    DateTime?
+  banReason     String?
+  banned        Boolean?  @default(false)
+  role          String?
   accounts      Account[]
   chats         Chat[]
+  files         File[]
   sessions      Session[]
-
-  role       String?
-  banned     Boolean?  @default(false)
-  banReason  String?
-  banExpires DateTime?
 
   @@map("user")
 }
 
 model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
   impersonatedBy String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("session")
@@ -84,10 +82,14 @@ model Chat {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   userId         String?   @map("user_id")
+  isPinned       Boolean   @default(false)
   user           User?     @relation(fields: [userId], references: [id])
+  files          File[]
   messages       Message[]
 
   @@index([userId])
+  @@index([isPinned])
+  @@index([updatedAt])
   @@map("chats")
 }
 
@@ -98,28 +100,70 @@ model Message {
   content   String
   parts     Json
   createdAt DateTime @default(now()) @map("created_at")
+  files     File[]
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
+  @@index([createdAt])
   @@map("messages")
 }
 
-model SourceDocument {
-  id        String                  @id @default(cuid())
-  content   String?
-  createdAt DateTime                @default(now()) @map("created_at")
-  segments  SourceDocumentSegment[]
+model File {
+  id            String   @id @default(cuid())
+  name          String
+  size          Int
+  mimeType      String
+  path          String
+  storageKey    String
+  url           String?
+  description   String?
+  pageCount     Int?
+  extractedText String?
+  metadata      Json?
+  userId        String
+  chatId        String?
+  messageId     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  chat          Chat?    @relation(fields: [chatId], references: [id])
+  message       Message? @relation(fields: [messageId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([messageId])
+  @@index([createdAt])
+  @@index([mimeType])
+  @@map("files")
 }
 
+model SourceDocument {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content               String                  @unique
+  filename              String
+  source                String
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  source_url            String?
+  SourceDocumentSegment SourceDocumentSegment[]
+
+  @@map("SourceDocument")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model SourceDocumentSegment {
-  id               String                 @id @default(cuid())
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   content          String
-  sourceDocumentid String?
-  vector           Unsupported("vector")?
-  article_number   Int
+  sourceDocumentid String         @db.Uuid
+  vector           Unsupported("vector")
+  createdAt        DateTime?      @default(now()) @db.Timestamp(6)
   chunk_index      Int
-  createdAt        DateTime               @default(now())
-  page_number      Int
-  tags             String[]
-  sourceDocument   SourceDocument?        @relation(fields: [sourceDocumentid], references: [id])
+  page_number      Int?
+  tags             Json?          @default("[]")
+  article_number   Int?           @default(0)
+  SourceDocument   SourceDocument @relation(fields: [sourceDocumentid], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sourceDocumentid], map: "idx_segment_document_id")
+  @@index([tags], map: "idx_segment_tags", type: Gin)
+  @@index([vector], map: "idx_source_document_segment_vector")
+  @@map("SourceDocumentSegment")
 }

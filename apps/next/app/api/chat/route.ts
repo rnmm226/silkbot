@@ -73,9 +73,29 @@ function createStreamResponse(agentPromise: Promise<GeminiStructuredResponse>) {
   );
 }
 
+// ✅ AJOUT : Fonction pour créer un nouveau chat
+async function createNewChat(userId?: string) {
+  const chatId = generateId();
+  await saveChat({
+    chatId,
+    userId,
+    title: 'Nouvelle conversation',
+  });
+  return chatId;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message, id, stream = false, agent = 'react' } = await req.json();
+    
+    // ✅ Gestion de la création d'un nouveau chat
+    if (!id && !message) {
+      // Créer un nouveau chat vide
+      const session = await auth.api.getSession({ headers: req.headers });
+      const userId = session?.user?.id;
+      const chatId = await createNewChat(userId);
+      return NextResponse.json({ id: chatId });
+    }
     
     if (!id || !message) {
       return NextResponse.json({ error: 'Chat ID and message required' }, { status: 400 });
@@ -170,42 +190,61 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ✅ CORRECTION : GET avec meilleur formatage des données
 export async function GET(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  const userId = session?.user?.id;
-  const q = req.nextUrl.searchParams.get('q') || '';
+  try {
+    const session = await auth.api.getSession({ headers: req.headers });
+    const userId = session?.user?.id;
 
-  if (!userId) return NextResponse.json([]);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!q) {
-    const conversations = await getUserConversations(userId);
+    const q = req.nextUrl.searchParams.get('q') || '';
+
+    let conversations;
+    
+    if (!q) {
+      // Récupérer toutes les conversations
+      conversations = await getUserConversations(userId);
+    } else {
+      // Rechercher avec filtre
+      const results = await prisma.chat.findMany({
+        where: {
+          userId,
+          OR: [
+            { title: { contains: q, mode: 'insensitive' } },
+            { messages: { some: { content: { contains: q, mode: 'insensitive' } } } },
+          ],
+        },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          messages: { 
+            orderBy: { createdAt: 'desc' }, 
+            take: 1 
+          },
+          _count: { 
+            select: { messages: true } 
+          },
+        },
+      });
+
+      conversations = results.map(conv => ({
+        id: conv.id,
+        title: conv.title || 'Nouvelle conversation',
+        updatedAt: conv.updatedAt,
+        createdAt: conv.createdAt,
+        lastMessage: conv.messages[0]?.content || '',
+        messageCount: conv._count.messages,
+      }));
+    }
+
     return NextResponse.json(conversations);
+    
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    return NextResponse.json([], { status: 500 });
   }
-
-  const results = await prisma.chat.findMany({
-    where: {
-      userId,
-      OR: [
-        { title: { contains: q, mode: 'insensitive' } },
-        { messages: { some: { content: { contains: q, mode: 'insensitive' } } } },
-      ],
-    },
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      messages: { orderBy: { createdAt: 'desc' }, take: 1 },
-      _count: { select: { messages: true } },
-    },
-  });
-
-  return NextResponse.json(
-    results.map(conv => ({
-      id: conv.id,
-      title: conv.title || 'Nouvelle conversation',
-      updatedAt: conv.updatedAt,
-      lastMessage: conv.messages[0]?.content || '',
-      messageCount: conv._count.messages,
-    }))
-  );
 }
 
 export async function OPTIONS(req: NextRequest) {

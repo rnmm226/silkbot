@@ -102,19 +102,7 @@ export function NavActions({
   return (
     <div className="flex items-center gap-1">
       {/* Favori */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={toggleStar}
-        aria-pressed={starred}
-        title={starred ? "Retirer des favoris" : "Ajouter aux favoris"}
-        className={cn(
-          "transition-colors",
-          starred ? "text-primary" : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <StarIcon className={cn("size-4", starred && "fill-primary")} />
-      </Button>
+      
 
       {/* Menu d'actions */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>

@@ -14,11 +14,10 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { generateId } from 'ai';
 import type { UIMessage } from 'ai';
-import { Send, Pencil, X, ChevronDown, ChevronUp, FileText, Scale, Sparkles, Copy, Check, Loader2 } from 'lucide-react';
+import { Send, Pencil, X, ChevronDown, ChevronUp, FileText, Scale, Sparkles, Copy, Check, Loader2, Paperclip } from 'lucide-react';
 import { PDFViewer } from "@/components/PDFViewer";
 import ReactMarkdown from 'react-markdown';
 import Image from "next/image";
-
 
 // ─────────────────────────────────────────────
 // Types
@@ -50,6 +49,16 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   structured?: StructuredResponse;
+}
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+  uploading?: boolean;
+  error?: string;
 }
 
 // ─────────────────────────────────────────────
@@ -118,6 +127,7 @@ function MessageActions({
         onClick={copyToClipboard}
         className="p-1 rounded-md hover:bg-accent transition-colors"
         title="Copier le message"
+        aria-label="Copier le message"
       >
         {copied ? (
           <Check className="w-3.5 h-3.5 text-green-500" />
@@ -130,6 +140,7 @@ function MessageActions({
           onClick={onEdit}
           className="p-1 rounded-md hover:bg-accent transition-colors"
           title="Modifier le message"
+          aria-label="Modifier le message"
         >
           <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
@@ -156,6 +167,7 @@ function ThinkingBlock({ summary }: { summary: ThinkingSummary }) {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors"
         style={{ background: 'transparent' }}
+        aria-expanded={open}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <Sparkles
@@ -249,6 +261,7 @@ function SourcesBlock({ sources, onSourceClick }: { sources: UsedSource[]; onSou
             key={source.chunk_id}
             onClick={() => onSourceClick(source)}
             title={source.excerpt}
+            aria-label={`Ouvrir la source ${source.filename}${source.page ? `, page ${source.page}` : ''}`}
             className="flex items-center gap-1.5 transition-all"
             style={{
               padding: '4px 10px 4px 7px',
@@ -323,6 +336,123 @@ function AssistantBubble({ msg, onSourceClick }: { msg: ChatMessage; onSourceCli
 }
 
 // ─────────────────────────────────────────────
+// FileUploadButton - Composant pour l'upload
+// ─────────────────────────────────────────────
+
+function FileUploadButton({ 
+  onFileSelect, 
+  disabled,
+  acceptedTypes = ['.pdf', '.doc', '.docx', '.txt'],
+  maxSize = 10
+}: { 
+  onFileSelect: (file: File) => void;
+  disabled?: boolean;
+  acceptedTypes?: string[];
+  maxSize?: number;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+
+    // Validation taille
+    if (file.size > maxSize * 1024 * 1024) {
+      setError(`Le fichier dépasse ${maxSize} Mo`);
+      return;
+    }
+
+    // Validation type
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!acceptedTypes.includes(ext)) {
+      setError(`Type non supporté. Acceptés: ${acceptedTypes.join(', ')}`);
+      return;
+    }
+
+    onFileSelect(file);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="relative">
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleChange}
+        accept={acceptedTypes.join(',')}
+        disabled={disabled}
+      />
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled}
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors hover:bg-accent disabled:opacity-40"
+        title="Joindre un fichier"
+        aria-label="Joindre un fichier"
+      >
+        <Paperclip className="w-4 h-4 text-muted-foreground" />
+      </button>
+      {error && (
+        <div className="absolute bottom-full left-0 mb-2 p-2 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive whitespace-nowrap">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// AttachedFile - Affichage d'un fichier joint
+// ─────────────────────────────────────────────
+
+function AttachedFile({ 
+  file, 
+  onRemove 
+}: { 
+  file: UploadedFile; 
+  onRemove: (id: string) => void;
+}) {
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg border border-border/50 group max-w-[200px]">
+      <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate">{file.name}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {formatSize(file.size)}
+          {file.uploading && ' · Upload...'}
+          {file.error && <span className="text-destructive"> · Erreur</span>}
+        </div>
+      </div>
+      {!file.uploading && (
+        <button
+          onClick={() => onRemove(file.id)}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-destructive/10 rounded"
+          aria-label={`Retirer le fichier ${file.name}`}
+        >
+          <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Suggestions
 // ─────────────────────────────────────────────
 
@@ -353,11 +483,18 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [logoError, setLogoError] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const chatId = id ?? useMemo(() => generateId(), []);
+
+  // FIX: l'ancien code était `id ?? useMemo(() => generateId(), [])`. Le `??`
+  // court-circuite l'appel du hook selon la présence de `id`, ce qui viole les
+  // règles des Hooks React (un hook ne doit jamais être appelé conditionnellement).
+  // On appelle systématiquement useMemo, et on ne s'en sert que si `id` est absent.
+  const fallbackId = useMemo(() => generateId(), []);
+  const chatId = id ?? fallbackId;
 
   const LOADING_STEPS = ["Recherche dans les documents…", "Analyse des passages…", "Rédaction de la réponse…"];
 
@@ -370,12 +507,19 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (!id) return;
     setMessages([]);
+
+    // FIX: protection contre une condition de course — si l'utilisateur change
+    // rapidement de conversation dans la sidebar, une requête lente pour l'ancien
+    // chat ne doit pas écraser les messages de la nouvelle conversation une fois résolue.
+    let isCurrent = true;
     fetch(`/api/chat/${id}/messages`)
       .then(res => res.ok ? res.json() : [])
       .then((msgs: UIMessage[]) => {
-        setMessages(convertUIMessages(msgs));
+        if (isCurrent) setMessages(convertUIMessages(msgs));
       })
       .catch(() => {});
+
+    return () => { isCurrent = false; };
   }, [id]);
 
   useEffect(() => {
@@ -428,81 +572,36 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       return;
     }
 
-    // Update local state
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId 
-        ? { ...msg, text: editInput.trim() }
-        : msg
-    ));
-
-    // If it's a user message, we need to regenerate the assistant response
     const messageIndex = messages.findIndex(m => m.id === messageId);
-    if (messageIndex !== -1 && messages[messageIndex].role === 'user') {
-      // Remove all messages after this one (including the assistant response)
-      const updatedMessages = messages.slice(0, messageIndex + 1);
-      updatedMessages[messageIndex] = { 
-        ...updatedMessages[messageIndex], 
-        text: editInput.trim() 
-      };
-      setMessages(updatedMessages);
 
-      // Send the edited message to get a new response
-      setLoading(true);
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: chatId,
-            message: { 
-              id: updatedMessages[messageIndex].id, 
-              role: 'user', 
-              parts: [{ type: 'text', text: editInput.trim() }] 
-            },
-          }),
-        });
-
-        const resData = await res.json();
-        if (!res.ok) throw new Error(resData.error || `HTTP ${res.status}`);
-
-        const structured = resData as StructuredResponse;
-        setMessages(prev => [...prev, {
-          id: generateId(),
-          role: 'assistant',
-          text: structured.answer,
-          structured,
-        }]);
-      } catch (err) {
-        setMessages(prev => [...prev, {
-          id: generateId(),
-          role: 'assistant',
-          text: `Erreur : ${(err as Error).message}`,
-        }]);
-      } finally {
-        setLoading(false);
-        cancelEditMessage();
-      }
-    } else {
+    // FIX: l'ancien code appelait deux fois setMessages (une fois via .map() pour
+    // mettre à jour le texte, puis une seconde fois via .slice() pour tronquer la
+    // conversation) — le premier appel était systématiquement écrasé par le second.
+    // On ne garde qu'une seule mise à jour d'état, plus claire.
+    if (messageIndex === -1 || messages[messageIndex].role !== 'user') {
       cancelEditMessage();
+      return;
     }
-  };
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    const updatedMessages = messages.slice(0, messageIndex + 1);
+    updatedMessages[messageIndex] = {
+      ...updatedMessages[messageIndex],
+      text: editInput.trim(),
+    };
+    setMessages(updatedMessages);
 
-    const userMsg: ChatMessage = { id: generateId(), role: 'user', text: input };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
     setLoading(true);
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: chatId,
-          message: { id: userMsg.id, role: 'user', parts: [{ type: 'text', text: userMsg.text }] },
+          message: { 
+            id: updatedMessages[messageIndex].id, 
+            role: 'user', 
+            parts: [{ type: 'text', text: editInput.trim() }] 
+          },
         }),
       });
 
@@ -516,6 +615,134 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
         text: structured.answer,
         structured,
       }]);
+      window.dispatchEvent(new Event('chat-updated'));
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        id: generateId(),
+        role: 'assistant',
+        text: `Erreur : ${(err as Error).message}`,
+      }]);
+    } finally {
+      setLoading(false);
+      cancelEditMessage();
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // Gestion des fichiers
+  // ─────────────────────────────────────────────
+
+  const handleFileSelect = (file: File) => {
+    const newFile: UploadedFile = {
+      id: generateId(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      uploading: true,
+    };
+
+    setUploadedFiles(prev => [...prev, newFile]);
+
+    // Upload réel
+    uploadFile(file, newFile.id);
+  };
+
+  const uploadFile = async (file: File, fileId: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('chatId', chatId);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de l\'upload');
+      }
+
+      const data = await response.json();
+
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === fileId 
+          ? { ...f, uploading: false, url: data.url }
+          : f
+      ));
+
+      // Ajouter un message système indiquant que le fichier a été uploadé
+      setMessages(prev => [...prev, {
+        id: generateId(),
+        role: 'assistant',
+        text: `📎 **Fichier joint** : ${file.name}\n\nLe fichier a été téléchargé avec succès. Vous pouvez maintenant poser des questions à son sujet.`,
+      }]);
+
+      window.dispatchEvent(new Event('chat-updated'));
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === fileId 
+          ? { ...f, uploading: false, error: error instanceof Error ? error.message : 'Erreur d\'upload' }
+          : f
+      ));
+    }
+  };
+
+  const handleRemoveFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // ─────────────────────────────────────────────
+  // Envoi de message
+  // ─────────────────────────────────────────────
+
+  // FIX: un fichier encore en cours d'upload n'est pas disponible côté serveur —
+  // on bloque l'envoi tant qu'au moins un fichier joint est encore "uploading".
+  const hasFilesUploading = uploadedFiles.some(f => f.uploading);
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading || hasFilesUploading) return;
+
+    // Construire le message avec les fichiers joints
+    let messageText = input;
+    if (uploadedFiles.length > 0) {
+      const fileNames = uploadedFiles.map(f => f.name).join(', ');
+      messageText = `${input}\n\n[Fichiers joints: ${fileNames}]`;
+    }
+
+    const userMsg: ChatMessage = { id: generateId(), role: 'user', text: messageText };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: chatId,
+          message: { id: userMsg.id, role: 'user', parts: [{ type: 'text', text: messageText }] },
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || `HTTP ${res.status}`);
+
+      const structured = resData as StructuredResponse;
+      setMessages(prev => [...prev, {
+        id: generateId(),
+        role: 'assistant',
+        text: structured.answer,
+        structured,
+      }]);
+
+      // Vider les fichiers après l'envoi
+      setUploadedFiles([]);
+      window.dispatchEvent(new Event('chat-updated'));
+
     } catch (err) {
       setMessages(prev => [...prev, {
         id: generateId(),
@@ -544,6 +771,10 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
       console.error('Erreur lors du partage:', err);
     }
   };
+
+  // ─────────────────────────────────────────────
+  // Rendu
+  // ─────────────────────────────────────────────
 
   if (isPending) return (
     <div
@@ -602,34 +833,8 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
           />
           <Separator orientation="vertical" className="h-4 opacity-20" />
 
-          {/* Logo */}
-          <div
-            className="flex size-6 items-center justify-center rounded-md overflow-hidden"
-            style={{ background: 'var(--primary)' }}
-          >
-            {logoError ? (
-              <span className="text-xs font-bold" style={{ color: 'var(--primary-foreground)' }}>⚖️</span>
-            ) : (
-              <Image
-                src="/silkbot-logo-white.png"
-                alt="SilkBot Logo"
-                width={24}
-                height={24}
-                className="object-contain"
-                onError={() => setLogoError(true)}
-              />
-            )}
-          </div>
-          {!logoError && (
-            <Image
-              src="/silkbot-black.png"
-              alt="SilkBot"
-              width={70}
-              height={22}
-              className="object-contain block dark:hidden"
-              onError={() => setLogoError(true)}
-            />
-          )}
+          
+            
 
           <Breadcrumb className="flex-1 min-w-0">
             <BreadcrumbList>
@@ -650,6 +855,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         borderColor: 'var(--primary)',
                         color: 'var(--foreground)',
                       }}
+                      aria-label="Titre de la conversation"
                     />
                   ) : (
                     <button
@@ -684,14 +890,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
               onExportPdf={() => window.print()}
               onDelete={handleDeleteChat}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => authClient.signOut()}
-              className="text-xs h-7 font-normal"
-            >
-              Déconnexion
-            </Button>
+            
           </div>
         </header>
 
@@ -755,7 +954,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     <button
                       key={s.label}
                       onClick={() => setInput(s.prompt)}
-                      className="text-left p-3 rounded-lg transition-all"
+                      className="text-left p-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5"
                       style={{
                         background: 'var(--card)',
                         border: '1px solid var(--border)',
@@ -853,6 +1052,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                               minHeight: '60px',
                             }}
                             rows={3}
+                            aria-label="Modifier le message"
                           />
                           <div className="flex gap-2">
                             <button
@@ -891,7 +1091,6 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         <AssistantBubble msg={message} onSourceClick={setSelectedSource} />
                       )}
 
-                      {/* Message actions - only show when not editing */}
                       {!isEditing && (
                         <MessageActions
                           text={message.text}
@@ -918,7 +1117,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 );
               })}
 
-              {/* Loading indicator - sans LoaderSparkle */}
+              {/* Loading indicator */}
               {loading && (
                 <div
                   className="flex gap-3 justify-start"
@@ -978,6 +1177,20 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
             }}
           >
             <div className="max-w-3xl mx-auto">
+              {/* Fichiers attachés */}
+              {uploadedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {uploadedFiles.map((file) => (
+                    <AttachedFile
+                      key={file.id}
+                      file={file}
+                      onRemove={handleRemoveFile}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Zone de saisie */}
               <div
                 className="flex items-end gap-2.5 rounded-lg px-4 py-3 transition-all duration-200"
                 style={{
@@ -1013,16 +1226,30 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                     color: 'var(--foreground)',
                     fontFamily: 'var(--font-sans)',
                   }}
+                  aria-label="Question juridique"
                 />
+
+                {/* Bouton d'upload */}
+                <FileUploadButton
+                  onFileSelect={handleFileSelect}
+                  disabled={loading}
+                  acceptedTypes={['.pdf', '.doc', '.docx', '.txt']}
+                  maxSize={10}
+                />
+
+                {/* Bouton d'envoi */}
                 <button
                   onClick={sendMessage}
-                  disabled={loading || !input.trim()}
+                  disabled={loading || !input.trim() || hasFilesUploading}
                   className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mb-0.5 transition-all active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                   style={{ background: 'var(--primary)' }}
+                  aria-label="Envoyer le message"
+                  title={hasFilesUploading ? "Patientez, le fichier est en cours d'envoi…" : "Envoyer"}
                 >
                   <Send className="w-3.5 h-3.5" style={{ color: 'var(--primary-foreground)' }} />
                 </button>
               </div>
+
               <p
                 className="text-center mt-2"
                 style={{
@@ -1031,7 +1258,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                   opacity: 0.5,
                 }}
               >
-                Entrée pour envoyer · Shift+Entrée pour un saut de ligne
+                Entrée pour envoyer · Shift+Entrée pour un saut de ligne · 📎 pour joindre un fichier
               </p>
             </div>
           </div>
@@ -1103,6 +1330,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                 onClick={() => setSelectedSource(null)}
                 className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ml-3 transition-colors"
                 style={{ color: 'var(--muted-foreground)' }}
+                aria-label="Fermer l'aperçu du document"
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent)';
                 }}

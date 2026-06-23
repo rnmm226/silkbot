@@ -186,6 +186,7 @@ export type MessageWhereInput = {
   content?: Prisma.StringFilter<"Message"> | string
   parts?: Prisma.JsonFilter<"Message">
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
+  files?: Prisma.FileListRelationFilter
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
 }
 
@@ -196,6 +197,7 @@ export type MessageOrderByWithRelationInput = {
   content?: Prisma.SortOrder
   parts?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  files?: Prisma.FileOrderByRelationAggregateInput
   chat?: Prisma.ChatOrderByWithRelationInput
 }
 
@@ -209,6 +211,7 @@ export type MessageWhereUniqueInput = Prisma.AtLeast<{
   content?: Prisma.StringFilter<"Message"> | string
   parts?: Prisma.JsonFilter<"Message">
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
+  files?: Prisma.FileListRelationFilter
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
 }, "id">
 
@@ -242,6 +245,7 @@ export type MessageCreateInput = {
   content: string
   parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  files?: Prisma.FileCreateNestedManyWithoutMessageInput
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
 }
 
@@ -252,6 +256,7 @@ export type MessageUncheckedCreateInput = {
   content: string
   parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutMessageInput
 }
 
 export type MessageUpdateInput = {
@@ -260,6 +265,7 @@ export type MessageUpdateInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUpdateManyWithoutMessageNestedInput
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
 }
 
@@ -270,6 +276,7 @@ export type MessageUncheckedUpdateInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUncheckedUpdateManyWithoutMessageNestedInput
 }
 
 export type MessageCreateManyInput = {
@@ -333,6 +340,11 @@ export type MessageMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
 }
 
+export type MessageNullableScalarRelationFilter = {
+  is?: Prisma.MessageWhereInput | null
+  isNot?: Prisma.MessageWhereInput | null
+}
+
 export type MessageCreateNestedManyWithoutChatInput = {
   create?: Prisma.XOR<Prisma.MessageCreateWithoutChatInput, Prisma.MessageUncheckedCreateWithoutChatInput> | Prisma.MessageCreateWithoutChatInput[] | Prisma.MessageUncheckedCreateWithoutChatInput[]
   connectOrCreate?: Prisma.MessageCreateOrConnectWithoutChatInput | Prisma.MessageCreateOrConnectWithoutChatInput[]
@@ -375,12 +387,29 @@ export type MessageUncheckedUpdateManyWithoutChatNestedInput = {
   deleteMany?: Prisma.MessageScalarWhereInput | Prisma.MessageScalarWhereInput[]
 }
 
+export type MessageCreateNestedOneWithoutFilesInput = {
+  create?: Prisma.XOR<Prisma.MessageCreateWithoutFilesInput, Prisma.MessageUncheckedCreateWithoutFilesInput>
+  connectOrCreate?: Prisma.MessageCreateOrConnectWithoutFilesInput
+  connect?: Prisma.MessageWhereUniqueInput
+}
+
+export type MessageUpdateOneWithoutFilesNestedInput = {
+  create?: Prisma.XOR<Prisma.MessageCreateWithoutFilesInput, Prisma.MessageUncheckedCreateWithoutFilesInput>
+  connectOrCreate?: Prisma.MessageCreateOrConnectWithoutFilesInput
+  upsert?: Prisma.MessageUpsertWithoutFilesInput
+  disconnect?: Prisma.MessageWhereInput | boolean
+  delete?: Prisma.MessageWhereInput | boolean
+  connect?: Prisma.MessageWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MessageUpdateToOneWithWhereWithoutFilesInput, Prisma.MessageUpdateWithoutFilesInput>, Prisma.MessageUncheckedUpdateWithoutFilesInput>
+}
+
 export type MessageCreateWithoutChatInput = {
   id?: string
   role: string
   content: string
   parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  files?: Prisma.FileCreateNestedManyWithoutMessageInput
 }
 
 export type MessageUncheckedCreateWithoutChatInput = {
@@ -389,6 +418,7 @@ export type MessageUncheckedCreateWithoutChatInput = {
   content: string
   parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  files?: Prisma.FileUncheckedCreateNestedManyWithoutMessageInput
 }
 
 export type MessageCreateOrConnectWithoutChatInput = {
@@ -429,6 +459,58 @@ export type MessageScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
 }
 
+export type MessageCreateWithoutFilesInput = {
+  id?: string
+  role: string
+  content: string
+  parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
+}
+
+export type MessageUncheckedCreateWithoutFilesInput = {
+  id?: string
+  chatId: string
+  role: string
+  content: string
+  parts: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type MessageCreateOrConnectWithoutFilesInput = {
+  where: Prisma.MessageWhereUniqueInput
+  create: Prisma.XOR<Prisma.MessageCreateWithoutFilesInput, Prisma.MessageUncheckedCreateWithoutFilesInput>
+}
+
+export type MessageUpsertWithoutFilesInput = {
+  update: Prisma.XOR<Prisma.MessageUpdateWithoutFilesInput, Prisma.MessageUncheckedUpdateWithoutFilesInput>
+  create: Prisma.XOR<Prisma.MessageCreateWithoutFilesInput, Prisma.MessageUncheckedCreateWithoutFilesInput>
+  where?: Prisma.MessageWhereInput
+}
+
+export type MessageUpdateToOneWithWhereWithoutFilesInput = {
+  where?: Prisma.MessageWhereInput
+  data: Prisma.XOR<Prisma.MessageUpdateWithoutFilesInput, Prisma.MessageUncheckedUpdateWithoutFilesInput>
+}
+
+export type MessageUpdateWithoutFilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
+}
+
+export type MessageUncheckedUpdateWithoutFilesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  chatId?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type MessageCreateManyChatInput = {
   id?: string
   role: string
@@ -443,6 +525,7 @@ export type MessageUpdateWithoutChatInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUpdateManyWithoutMessageNestedInput
 }
 
 export type MessageUncheckedUpdateWithoutChatInput = {
@@ -451,6 +534,7 @@ export type MessageUncheckedUpdateWithoutChatInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   parts?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  files?: Prisma.FileUncheckedUpdateManyWithoutMessageNestedInput
 }
 
 export type MessageUncheckedUpdateManyWithoutChatInput = {
@@ -462,6 +546,35 @@ export type MessageUncheckedUpdateManyWithoutChatInput = {
 }
 
 
+/**
+ * Count Type MessageCountOutputType
+ */
+
+export type MessageCountOutputType = {
+  files: number
+}
+
+export type MessageCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  files?: boolean | MessageCountOutputTypeCountFilesArgs
+}
+
+/**
+ * MessageCountOutputType without action
+ */
+export type MessageCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MessageCountOutputType
+   */
+  select?: Prisma.MessageCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * MessageCountOutputType without action
+ */
+export type MessageCountOutputTypeCountFilesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FileWhereInput
+}
+
 
 export type MessageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -470,7 +583,9 @@ export type MessageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   content?: boolean
   parts?: boolean
   createdAt?: boolean
+  files?: boolean | Prisma.Message$filesArgs<ExtArgs>
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
+  _count?: boolean | Prisma.MessageCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["message"]>
 
 export type MessageSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -504,7 +619,9 @@ export type MessageSelectScalar = {
 
 export type MessageOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "chatId" | "role" | "content" | "parts" | "createdAt", ExtArgs["result"]["message"]>
 export type MessageInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  files?: boolean | Prisma.Message$filesArgs<ExtArgs>
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
+  _count?: boolean | Prisma.MessageCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MessageIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
@@ -516,6 +633,7 @@ export type MessageIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
 export type $MessagePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Message"
   objects: {
+    files: Prisma.$FilePayload<ExtArgs>[]
     chat: Prisma.$ChatPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -919,6 +1037,7 @@ readonly fields: MessageFieldRefs;
  */
 export interface Prisma__MessageClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  files<T extends Prisma.Message$filesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Message$filesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   chat<T extends Prisma.ChatDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ChatDefaultArgs<ExtArgs>>): Prisma.Prisma__ChatClient<runtime.Types.Result.GetResult<Prisma.$ChatPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1353,6 +1472,30 @@ export type MessageDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Messages to delete.
    */
   limit?: number
+}
+
+/**
+ * Message.files
+ */
+export type Message$filesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the File
+   */
+  select?: Prisma.FileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the File
+   */
+  omit?: Prisma.FileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FileInclude<ExtArgs> | null
+  where?: Prisma.FileWhereInput
+  orderBy?: Prisma.FileOrderByWithRelationInput | Prisma.FileOrderByWithRelationInput[]
+  cursor?: Prisma.FileWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FileScalarFieldEnum | Prisma.FileScalarFieldEnum[]
 }
 
 /**
