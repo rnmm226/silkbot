@@ -1,6 +1,6 @@
 // app/api/chat/prompt.ts
 import type { RagChunk } from './types';
-import { TOOL_DESCRIPTIONS } from './tools';
+import { QUERY_TOOL_DESCRIPTIONS } from './tools';
 
 export const SYSTEM_PROMPT = `Tu es Counsel, un assistant juridique tunisien expert.
 
@@ -21,11 +21,13 @@ Pour chaque passage fourni, décide ensuite s'il est pertinent. Un passage est p
 ÉTAPE 3 — TRAÇABILITÉ
 Pour chaque information utilisée provenant d'un document, identifie le chunk_id source exact.
 N'inclus dans used_sources QUE les chunks réellement pertinents et réellement cités dans ta réponse.
+Pour le champ "page" : reprends EXACTEMENT le numéro affiché dans le passage source (ligne "page: ..." ci-dessous). Ne mets "null" que si le passage n'a aucun numéro de page (cas d'un passage avec un champ "url").
 Si le passage source possède un champ url, inclure ce lien dans used_sources (champ "url"). Sinon, laisser "url": null.
 
 RÈGLES ABSOLUES :
 - Ne jamais inventer un article, un numéro de loi ou une référence précise absente des documents.
 - Ne jamais inclure un chunk non pertinent dans used_sources.
+- Ne jamais mettre "page": null par défaut si un numéro de page réel est disponible dans le passage source.
 - Pour une question générale sans document pertinent, tu PEUX répondre avec tes connaissances générales, mais signale-le dans thinking_summary (ex: "Réponse basée sur connaissances générales, non vérifiée par la base documentaire").
 - Répondre en français juridique professionnel.
 - Structurer avec des titres markdown (##) si la réponse dépasse 3 points.
@@ -95,7 +97,7 @@ ${documentsConsulted.join(', ')}
 
 Applique rigoureusement le processus en 3 étapes défini dans les instructions système.
 
-Réponds UNIQUEMENT en JSON valide contenant exactement cette structure :
+Réponds UNIQUEMENT en JSON valide contenant exactement cette structure (les valeurs entre <> sont des exemples de format, PAS des valeurs à copier littéralement — remplace-les par les vraies données) :
 
 {
   "thinking_summary": {
@@ -114,8 +116,8 @@ Réponds UNIQUEMENT en JSON valide contenant exactement cette structure :
     {
       "chunk_id": "...",
       "filename": "...",
-      "page": null,
-      "url": null,
+      "page": <numéro de page repris du passage source, ou null UNIQUEMENT si absent>,
+      "url": <lien repris du passage source, ou null si absent>,
       "excerpt": "..."
     }
   ]
@@ -126,7 +128,7 @@ export function buildPlannerPrompt(question: string, previousResults?: string): 
   return `Tu es un planificateur d'un Agent RAG spécialisé en droit tunisien.
 
 OUTILS DISPONIBLES :
-${TOOL_DESCRIPTIONS}
+${QUERY_TOOL_DESCRIPTIONS}
 
 QUESTION : "${question}"
 

@@ -14,6 +14,9 @@ export function parseStructured(
     if (!match) throw new Error('No JSON');
     const parsed = JSON.parse(match[0]) as GeminiStructuredResponse;
     if (!parsed.answer || !parsed.thinking_summary) throw new Error('Invalid');
+    // ✅ used_sources doit toujours être un tableau — sinon tout code en aval
+    // qui fait .map()/.length plante si Gemini omet ce champ.
+    parsed.used_sources = Array.isArray(parsed.used_sources) ? parsed.used_sources : [];
     return parsed;
   } catch (error) {
     console.warn('[Parser] ⚠️ Erreur de parsing, fallback à la réponse brute');

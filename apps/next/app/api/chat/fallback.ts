@@ -2,13 +2,10 @@
 import type { GeminiStructuredResponse, RagChunk } from './types';
 
 // ⚙️ Configuration
-const MIN_SIMILARITY = 0.25; // Seuil minimum de similarité (0-1)
+const MIN_SIMILARITY = 0.25;
 const MAX_CHUNKS = 3;
 const MAX_EXCERPT_LENGTH = 500;
 
-/**
- * Nettoie un extrait pour ne garder que le contenu pertinent
- */
 function cleanExcerpt(content: string, maxLength: number = MAX_EXCERPT_LENGTH): string {
   let cleaned = content
     .replace(/Page \d+/gi, '')
@@ -26,9 +23,6 @@ function cleanExcerpt(content: string, maxLength: number = MAX_EXCERPT_LENGTH): 
   return cleaned;
 }
 
-/**
- * Extrait les informations clés d'un chunk
- */
 function extractKeyInfo(chunk: RagChunk): {
   ministry?: string;
   actionType?: string;
@@ -38,21 +32,20 @@ function extractKeyInfo(chunk: RagChunk): {
   const content = chunk.content;
   const info: { ministry?: string; actionType?: string; date?: string; sourceType?: string } = {};
 
-  // Détecter le ministère
   const ministryPatterns = [
-    /Ministère\s+(?:du|de\s+l'|de\s+la)\s+([A-Z][a-zÀ-ÿ]+)/i,
-    /Ministère\s+de\s+l'([A-Z][a-zÀ-ÿ]+)/i,
+    /Ministère\s+(?:du|de\s+l'|de\s+la)\s+([A-Z][a-zÀ-ÿ]+(?:[\s-][A-Z][a-zÀ-ÿ]+)?)/i,
+    /Ministère\s+de\s+l'([A-Z][a-zÀ-ÿ]+(?:[\s-][A-Z][a-zÀ-ÿ]+)?)/i,
+    /Ministère\s+des?\s+([A-Z][a-zÀ-ÿ]+(?:[\s-][A-Z][a-zÀ-ÿ]+)?)/i,
   ];
   
   for (const pattern of ministryPatterns) {
     const match = content.match(pattern);
     if (match) {
-      info.ministry = match[1];
+      info.ministry = match[1].trim();
       break;
     }
   }
 
-  // Détecter le type d'action
   if (content.includes('Nomination')) {
     info.actionType = 'Nomination';
   } else if (content.includes('Arrêté')) {
@@ -65,7 +58,6 @@ function extractKeyInfo(chunk: RagChunk): {
     info.actionType = 'Cessation de fonctions';
   }
 
-  // Détecter la date
   const datePatterns = [
     /(\d{1,2}\s+\w+\s+\d{4})/,
     /(\d{1,2}\/\d{1,2}\/\d{4})/,
@@ -80,7 +72,6 @@ function extractKeyInfo(chunk: RagChunk): {
     }
   }
 
-  // Source type
   if (chunk.source_type) {
     const sourceLabels: Record<string, string> = {
       'jort': '📰 JORT',
@@ -93,73 +84,82 @@ function extractKeyInfo(chunk: RagChunk): {
   return info;
 }
 
-/**
- * Formate un chunk pour l'affichage
- */
 function formatChunk(chunk: RagChunk, index: number): string {
   const info = extractKeyInfo(chunk);
   const cleanedContent = cleanExcerpt(chunk.content);
   
   const parts: string[] = [];
   
-  // 1. En-tête avec métadonnées
   let header = `**Extrait ${index + 1}**`;
+  
   if (chunk.filename) {
-    header += ` — ${chunk.filename}`;
+    let linkUrl = '';
+    let target = '';
+    
+    // ✅ Priorité : document_id (lien vers notre API)
+    if (chunk.document_id) {
+      linkUrl = `/api/pdfs/${chunk.document_id}`;
+      target = ' target="_blank" rel="noopener noreferrer"';
+    } 
+    // ✅ Sinon : source_url (pour Luca Pacioli)
+    else if (chunk.source_url) {
+      linkUrl = chunk.source_url;
+      target = ' target="_blank" rel="noopener noreferrer"';
+    } 
+    // ✅ Fallback : chemin local
+    else {
+      linkUrl = `/pdfs/${encodeURIComponent(chunk.filename)}`;
+    }
+    
+    // Ajouter la page en paramètre
+    if (chunk.page && !chunk.source_url) {
+      const separator = linkUrl.includes('?') ? '&' : '?';
+      linkUrl += `${separator}page=${chunk.page}`;
+    }
+    
+    header += ` — <a href="${linkUrl}"${target}>📄 ${chunk.filename}</a>`;
   }
+  
   if (chunk.page) {
     header += ` (p.${chunk.page})`;
   }
-  // ✅ Utiliser similarity au lieu de score
+  
   if (chunk.similarity !== undefined && chunk.similarity !== null && chunk.similarity > 0) {
     const percent = Math.round(chunk.similarity * 100);
     header += ` — Pertinence: ${percent}%`;
   }
+  
   parts.push(header);
   
-  // 2. Tags d'information
   const tags: string[] = [];
   if (info.ministry) tags.push(`🏛️ ${info.ministry}`);
   if (info.actionType) tags.push(`📌 ${info.actionType}`);
   if (info.date) tags.push(`📅 ${info.date}`);
   if (info.sourceType) tags.push(info.sourceType);
-  if (chunk.source_url) tags.push(`🔗 [Lien](${chunk.source_url})`);
   if (tags.length > 0) {
     parts.push(`> ${tags.join(' · ')}`);
   }
   
-  // 3. Contenu nettoyé
   parts.push('');
   parts.push(cleanedContent);
   
   return parts.join('\n');
 }
 
-/**
- * Vérifie si un chunk a une similarité suffisante
- */
 function hasValidSimilarity(chunk: RagChunk): boolean {
-  // Si la similarité n'est pas définie, on considère comme valide
   if (chunk.similarity === undefined || chunk.similarity === null) {
     return true;
   }
   return chunk.similarity >= MIN_SIMILARITY;
 }
 
-/**
- * Récupère la similarité d'un chunk, ou 0 si non définie
- */
 function getSimilarity(chunk: RagChunk): number {
   return chunk.similarity ?? 0;
 }
 
-/**
- * Construit une réponse à partir des chunks (mode fallback)
- */
 export function buildRagOnlyResponse(
   chunks: RagChunk[]
 ): GeminiStructuredResponse {
-  // Cas 1: Aucun chunk trouvé
   if (chunks.length === 0) {
     return {
       thinking_summary: {
@@ -175,10 +175,8 @@ export function buildRagOnlyResponse(
     };
   }
 
-  // ✅ Filtrer par similarité minimum
   const filteredChunks = chunks.filter(chunk => hasValidSimilarity(chunk));
   
-  // Cas 2: Aucun chunk avec une similarité suffisante
   if (filteredChunks.length === 0) {
     const allDocs = [...new Set(chunks.map(c => c.filename))];
     return {
@@ -199,7 +197,6 @@ export function buildRagOnlyResponse(
     };
   }
 
-  // ✅ Trier par similarité (du plus élevé au plus bas)
   const sorted = [...filteredChunks].sort((a, b) => getSimilarity(b) - getSimilarity(a));
   const top = sorted.slice(0, MAX_CHUNKS);
   const allDocs = [...new Set(chunks.map(c => c.filename))];
@@ -237,20 +234,14 @@ export function buildRagOnlyResponse(
   };
 }
 
-/**
- * Génère une réponse de fallback avec la question posée
- */
 export function generateFallbackAnswer(
   question: string,
   chunks: RagChunk[],
   draft: string
 ): GeminiStructuredResponse {
-  // Cas 1: Des chunks sont disponibles
   if (chunks.length > 0) {
-    // ✅ Filtrer par similarité minimum
     const filteredChunks = chunks.filter(chunk => hasValidSimilarity(chunk));
     
-    // Cas 1a: Aucun chunk avec une similarité suffisante
     if (filteredChunks.length === 0) {
       const allDocs = [...new Set(chunks.map(c => c.filename))];
       return {
@@ -272,7 +263,6 @@ export function generateFallbackAnswer(
       };
     }
     
-    // ✅ Trier par similarité
     const sorted = [...filteredChunks].sort((a, b) => getSimilarity(b) - getSimilarity(a));
     const topChunks = sorted.slice(0, MAX_CHUNKS);
     const allDocs = [...new Set(chunks.map(c => c.filename))];
@@ -320,7 +310,6 @@ export function generateFallbackAnswer(
     };
   }
   
-  // Cas 2: Pas de chunks mais un draft existe
   if (draft) {
     return {
       thinking_summary: {
@@ -341,7 +330,6 @@ export function generateFallbackAnswer(
     };
   }
   
-  // Cas 3: Ni chunks ni draft
   return {
     thinking_summary: {
       chunks_analyzed: 0,
@@ -361,16 +349,10 @@ export function generateFallbackAnswer(
   };
 }
 
-/**
- * Vérifie si la réponse est en mode fallback
- */
 export function isFallbackResponse(response: GeminiStructuredResponse): boolean {
   return response.fallback === true;
 }
 
-/**
- * Formate une réponse de fallback pour l'affichage
- */
 export function formatFallbackResponse(response: GeminiStructuredResponse): string {
   if (!response.fallback) {
     return response.answer;

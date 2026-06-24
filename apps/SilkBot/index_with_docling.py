@@ -451,12 +451,12 @@ def insert_document(result):
         cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (unique_key,))
         existing = cur.fetchone()
         if existing:
-            return 0
+            return 0, existing[0]  # ✅ Retourner aussi l'ID existant
 
-        # Vérifier si la colonne source_url existe (évite de planter si la migration n'a pas encore été appliquée)
+        # Vérifier si la colonne source_url existe
         cur.execute("""SELECT column_name FROM information_schema.columns
                        WHERE table_name='SourceDocument' AND column_name='source_url'""")
-        has_source_url = cur.fetchone() is not None  # NOUVEAU
+        has_source_url = cur.fetchone() is not None
 
         if has_source_url:
             cur.execute(
@@ -472,203 +472,167 @@ def insert_document(result):
             )
         doc_id = cur.fetchone()[0]
 
+        # ✅ VÉRIFIER si la colonne document_id existe dans SourceDocumentSegment
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocumentSegment' AND column_name='document_id'""")
+        has_document_id = cur.fetchone() is not None
+
         # Vérifier si la colonne article_number existe
         cur.execute("""SELECT column_name FROM information_schema.columns
                        WHERE table_name='SourceDocumentSegment' AND column_name='article_number'""")
         has_article = cur.fetchone() is not None
 
+        # ✅ Préparer les colonnes dynamiquement
+        columns = ['id', 'content', '"sourceDocumentid"', 'vector', '"createdAt"', 'chunk_index', 'page_number', 'tags']
+        placeholders = ['gen_random_uuid()', '%s', '%s', '%s::vector', 'now()', '%s', '%s', '%s::jsonb']
+
+        if has_document_id:
+            columns.append('document_id')
+            placeholders.append('%s')
+
         if has_article:
-            rows = []
-            for c in result['chunks']:
-                rows.append((
-                    c['text'],
-                    doc_id,
-                    json.dumps(c['embedding']),
-                    c['chunk_index'],
-                    c['page_number'],
-                    json.dumps(c['tags']),
-                    c.get('article_number') or 0   # ✅ fix: `or 0` plutôt que .get(key, 0)
-                ))
-            cur.executemany(
-                '''INSERT INTO "SourceDocumentSegment"
-                   (id, content, "sourceDocumentid", vector, "createdAt",
-                    chunk_index, page_number, tags, article_number)
-                   VALUES (gen_random_uuid(), %s, %s, %s::vector, now(), %s, %s, %s::jsonb, %s)''',
-                rows,
-            )
-        else:
-            rows = []
-            for c in result['chunks']:
-                rows.append((
-                    c['text'],
-                    doc_id,
-                    json.dumps(c['embedding']),
-                    c['chunk_index'],
-                    c['page_number'],
-                    json.dumps(c['tags'])
-                ))
-            cur.executemany(
-                '''INSERT INTO "SourceDocumentSegment"
-                   (id, content, "sourceDocumentid", vector, "createdAt",
-                    chunk_index, page_number, tags)
-                   VALUES (gen_random_uuid(), %s, %s, %s::vector, now(), %s, %s, %s::jsonb)''',
-                rows,
-            )
+            columns.append('article_number')
+            placeholders.append('%s')
+
+        # ✅ Construire la requête dynamique
+        columns_str = ', '.join(columns)
+        placeholders_str = ', '.join(placeholders)
+
+        # ✅ Préparer les données
+        rows = []
+        for c in result['chunks']:
+            row = [
+                c['text'],
+                doc_id,
+                json.dumps(c['embedding']),
+                c['chunk_index'],
+                c['page_number'],
+                json.dumps(c['tags'])
+            ]
+
+            if has_document_id:
+                row.append(doc_id)  # ✅ Ajouter document_id (même valeur que sourceDocumentid)
+
+            if has_article:
+                row.append(c.get('article_number') or 0)
+
+            rows.append(row)
+
+        # ✅ Exécuter avec la bonne requête
+        query = f'''INSERT INTO "SourceDocumentSegment"
+                    ({columns_str})
+                    VALUES ({placeholders_str})'''
+
+        cur.executemany(query, rows)
 
         conn.commit()
-        return len(result['chunks'])
+        return len(result['chunks']), doc_id  # ✅ Retourner doc_id
     except Exception as e:
         conn.rollback()
         print(f"❌ Erreur insertion: {e}")
         import traceback
         traceback.print_exc()
-        return 0
+        return 0, None
     finally:
         cur.close()
-
 
 # ─────────────────────────────────────────────
 # TRAITEMENT D'UN PDF — connexion thread-local
 # ─────────────────────────────────────────────
-def process_and_insert(pdf_info, log_buf: deque):
-    filename = pdf_info['filename']
-    filepath = pdf_info['path']
-    relative_path = pdf_info['relative_path']
-    source = pdf_info['source']
-    unique_key = f"{source}/{relative_path}".replace("\\", "/")
-
-    conn = get_db_connection()  # connexion propre à ce thread
-
-    def log(msg):
-        log_buf.append(msg)
-
-    # ✅ CRUCIAL : Annuler toute transaction en cours avant de faire quoi que ce soit
+def insert_document(result):
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        conn.rollback()  # Assure que la connexion est dans un état propre
-    except:
-        pass
+        unique_key = f"{result['source']}/{result['relative_path']}".replace("\\", "/")
 
-    # Vérifier si le document existe déjà
-    try:
-        cur = conn.cursor()
+        # Vérifier si le document existe déjà
         cur.execute('SELECT id FROM "SourceDocument" WHERE content = %s', (unique_key,))
-        exists = cur.fetchone() is not None
-        cur.close()
-        conn.commit()  # ✅ IMPORTANT : valider la transaction de lecture
+        existing = cur.fetchone()
+        if existing:
+            return 0, existing[0]  # ✅ Retourner aussi l'ID existant
 
-        if exists and SKIP_EXISTING:
-            log(f"⏭️ Déjà indexé: {unique_key[:60]}")
-            save_progress(unique_key, 'skipped')
-            return True, 0, 'skipped'
-    except Exception as e:
-        log(f"⚠️ Erreur vérification: {e}")
-        conn.rollback()  # ✅ ANNULER en cas d'erreur
-        return False, 0, 'error'
+        # Vérifier si la colonne source_url existe
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocument' AND column_name='source_url'""")
+        has_source_url = cur.fetchone() is not None
 
-    try:
-        log(f"📄 Traitement: {unique_key[:60]}")
-
-        # Extraire le texte du PDF
-        full_text, num_pages, error = _run_with_timeout(
-            extract_from_pdf, PDF_EXTRACTION_TIMEOUT, filepath
-        )
-
-        if error or not full_text:
-            log(f"❌ {unique_key[:60]}: {error or 'Aucun texte'}")
-            save_progress(unique_key, 'error')
-            conn.rollback()
-            return False, 0, 'error'
-
-        # Chunking
-        chunks_text = chunk_text_by_words(full_text)
-        if not chunks_text:
-            log(f"❌ {unique_key[:60]}: Aucun chunk créé")
-            save_progress(unique_key, 'error')
-            conn.rollback()
-            return False, 0, 'error'
-
-        log(f"📝 {len(chunks_text)} chunks créés pour {unique_key[:40]}")
-
-        # Métadonnées du document
-        doc_meta = extract_legal_metadata(full_text, filename, source)
-
-        # Embeddings batch
-        embeddings = []
-        for i in range(0, len(chunks_text), EMBEDDING_BATCH_SIZE):
-            batch = chunks_text[i:i + EMBEDDING_BATCH_SIZE]
-            try:
-                batch_embeddings = embedding_model.encode(batch, show_progress_bar=False)
-                embeddings.extend(batch_embeddings)
-            except Exception as e:
-                log(f"⚠️ Erreur embedding batch {i}: {e}")
-                continue
-            gc.collect()
-
-        if len(embeddings) != len(chunks_text):
-            log(f"⚠️ Ajustement: {len(embeddings)} embeddings pour {len(chunks_text)} chunks")
-            chunks_text = chunks_text[:len(embeddings)]
-
-        # Construire les chunks avec métadonnées
-        chunks = []
-        for i, (c, e) in enumerate(zip(chunks_text, embeddings)):
-            chunk_data = {
-                'text': c,
-                'embedding': e.tolist(),
-                'chunk_index': i,
-                'page_number': min((i * CHUNK_SIZE // 500) + 1, num_pages or 1),
-                'tags': generate_tags(c, filename, doc_meta),
-                'article_number': extract_article_number(c),  # peut être None → géré dans insert_document
-            }
-            chunks.append(chunk_data)
-
-        # 🔹 URL source (uniquement pour Luca Pacioli pour l'instant) — NOUVEAU
-        source_url = PACIOLI_URL_MAP.get(filename) if source == 'luca_pacioli' else None
-        if source == 'luca_pacioli' and not source_url:
-            log(f"⚠️ Pas d'URL trouvée dans {PACIOLI_URL_MAP_FILE} pour: {filename}")
-
-        # ✅ ICI : Définir result AVANT de l'utiliser
-        result = {
-            'filename': filename,
-            'relative_path': relative_path,
-            'source': source,
-            'source_url': source_url,   # NOUVEAU
-            'num_pages': num_pages or 1,
-            'chunks': chunks,
-        }
-
-        # Insertion en base de données
-        inserted = insert_document(result)
-
-        if inserted > 0:
-            log(f"✅ [{source}] {relative_path[:50]} → {inserted} chunks")
-            save_progress(unique_key, 'inserted')
-            conn.commit()  # ✅ VALIDER
-            return True, inserted, 'inserted'
+        if has_source_url:
+            cur.execute(
+                'INSERT INTO "SourceDocument" (id, content, filename, source, source_url, created_at) '
+                'VALUES (gen_random_uuid(), %s, %s, %s, %s, now()) RETURNING id',
+                (unique_key, result['filename'], result['source'], result.get('source_url'))
+            )
         else:
-            log(f"⚠️ Aucun chunk inséré pour {unique_key[:50]}")
-            save_progress(unique_key, 'no_chunks')
-            conn.rollback()  # ✅ ANNULER
-            return False, 0, 'no_chunks'
+            cur.execute(
+                'INSERT INTO "SourceDocument" (id, content, filename, source, created_at) '
+                'VALUES (gen_random_uuid(), %s, %s, %s, now()) RETURNING id',
+                (unique_key, result['filename'], result['source'])
+            )
+        doc_id = cur.fetchone()[0]
 
-    except TimeoutError:
-        log(f"⏱️ Timeout: {unique_key[:60]}")
-        save_progress(unique_key, 'timeout')
-        conn.rollback()
-        return False, 0, 'timeout'
-    except MemoryError:
-        log(f"💾 Mémoire: {unique_key[:60]}")
-        gc.collect()
-        save_progress(unique_key, 'memory')
-        conn.rollback()
-        return False, 0, 'memory'
+        # ✅ VÉRIFIER si la colonne document_id existe dans SourceDocumentSegment
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocumentSegment' AND column_name='document_id'""")
+        has_document_id = cur.fetchone() is not None
+
+        # Vérifier si la colonne article_number existe
+        cur.execute("""SELECT column_name FROM information_schema.columns
+                       WHERE table_name='SourceDocumentSegment' AND column_name='article_number'""")
+        has_article = cur.fetchone() is not None
+
+        # ✅ Préparer les colonnes dynamiquement
+        columns = ['id', 'content', '"sourceDocumentid"', 'vector', '"createdAt"', 'chunk_index', 'page_number', 'tags']
+        placeholders = ['gen_random_uuid()', '%s', '%s', '%s::vector', 'now()', '%s', '%s', '%s::jsonb']
+
+        if has_document_id:
+            columns.append('document_id')
+            placeholders.append('%s')
+
+        if has_article:
+            columns.append('article_number')
+            placeholders.append('%s')
+
+        # ✅ Construire la requête dynamique
+        columns_str = ', '.join(columns)
+        placeholders_str = ', '.join(placeholders)
+
+        # ✅ Préparer les données
+        rows = []
+        for c in result['chunks']:
+            row = [
+                c['text'],
+                doc_id,
+                json.dumps(c['embedding']),
+                c['chunk_index'],
+                c['page_number'],
+                json.dumps(c['tags'])
+            ]
+
+            if has_document_id:
+                row.append(doc_id)  # ✅ Ajouter document_id (même valeur que sourceDocumentid)
+
+            if has_article:
+                row.append(c.get('article_number') or 0)
+
+            rows.append(row)
+
+        # ✅ Exécuter avec la bonne requête
+        query = f'''INSERT INTO "SourceDocumentSegment"
+                    ({columns_str})
+                    VALUES ({placeholders_str})'''
+
+        cur.executemany(query, rows)
+
+        conn.commit()
+        return len(result['chunks']), doc_id  # ✅ Retourner doc_id
     except Exception as e:
-        log(f"❌ Erreur {unique_key[:60]}: {e}")
+        conn.rollback()
+        print(f"❌ Erreur insertion: {e}")
         import traceback
         traceback.print_exc()
-        save_progress(unique_key, 'error')
-        conn.rollback()  # ✅ TOUJOURS ANNULER
-        return False, 0, 'error'
-
+        return 0, None
+    finally:
+        cur.close()
 
 # ─────────────────────────────────────────────
 # FICHIERS — parcours des 3 dossiers

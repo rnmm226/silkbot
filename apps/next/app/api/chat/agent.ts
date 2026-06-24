@@ -9,13 +9,13 @@ import { executeGeminiDecisions, decideToolsWithGemini } from "./gemini-tools";
 import { AgentError, LLMError, handleAgentError } from "./errors";
 import type { RagChunk, GeminiStructuredResponse } from "./types";
 
-const MAX_ITERATIONS = 3;
+// ✅ Réduit de 3 à 2 : chaque itération coûte un appel planner + un appel
+// de décision (potentiellement sur gemini-3.5-flash, plus lent). Avec le
+// bug de parsing semantic_search corrigé (data.chunks au lieu de
+// data.results), de vrais chunks remontent dès la 1ère itération dans la
+// plupart des cas, rendant une 3e itération rarement nécessaire.
+const MAX_ITERATIONS = 2;
 const MIN_CHUNKS_THRESHOLD = 5;
-
-// ✅ Nombre de chunks envoyés au prompt final.
-// Avant : 3 (trop peu vu qu'on accumule jusqu'à 20 chunks sur 3 itérations).
-// On monte à 8 — assez pour couvrir plusieurs articles/sources sans
-// faire exploser la taille du prompt envoyé à Gemini.
 const FINAL_CHUNKS_LIMIT = 8;
 
 function mergeAndDedupeChunks(allChunks: RagChunk[]): RagChunk[] {
@@ -27,18 +27,19 @@ function mergeAndDedupeChunks(allChunks: RagChunk[]): RagChunk[] {
     return unique.slice(0, 20);
 }
 
+function isSpecificQuestion(question: string): boolean {
+    return question.length > 50 ||
+        question.includes('article') ||
+        question.includes('loi') ||
+        question.includes('décret') ||
+        question.includes('code') ||
+        question.includes('TVA') ||
+        question.includes('exonération');
+}
+
 function hasEnoughInformation(chunks: RagChunk[], question: string): boolean {
     if (chunks.length >= MIN_CHUNKS_THRESHOLD) return true;
-
-    const isSpecific = question.length > 50 ||
-                       question.includes('article') ||
-                       question.includes('loi') ||
-                       question.includes('décret') ||
-                       question.includes('code') ||
-                       question.includes('TVA') ||
-                       question.includes('exonération');
-
-    if (isSpecific && chunks.length < 3) return false;
+    if (isSpecificQuestion(question)) return false;
     return chunks.length >= 3;
 }
 
@@ -124,18 +125,17 @@ export async function runAgent(
 
     let allChunks: RagChunk[] = [];
     let iteration = 0;
+    let iterationsRun = 0;
     let currentQuery = question;
     const steps: string[] = [];
-    // ✅ On garde une trace des erreurs d'outils rencontrées pendant
-    // la boucle, pour pouvoir les exposer dans thinking_summary même
-    // si la boucle se termine "normalement" (decision.continue === false).
     const toolErrors: string[] = [];
 
     console.log('[Agent] Boucle ReAct');
 
     while (iteration < MAX_ITERATIONS) {
-        console.log(`[Agent] Itération ${iteration + 1}/${MAX_ITERATIONS}`);
-        steps.push(`Itération ${iteration + 1}: recherche...`);
+        iterationsRun++;
+        console.log(`[Agent] Itération ${iterationsRun}/${MAX_ITERATIONS}`);
+        steps.push(`Itération ${iterationsRun}: recherche...`);
 
         try {
             const plan = await planQuestion(currentQuery);
@@ -151,8 +151,6 @@ export async function runAgent(
                     newChunks.push(...result.result.chunks);
                     steps.push(`${result.tool}: ${result.result.chunks.length} passages`);
                 } else if (result.error) {
-                    // ✅ On distingue maintenant les erreurs réelles (errors.ts)
-                    // dans les steps ET dans toolErrors pour réutilisation.
                     steps.push(`${result.tool}: Erreur — ${result.error}`);
                     toolErrors.push(`${result.tool}: ${result.error}`);
                 }
@@ -188,21 +186,38 @@ export async function runAgent(
             }
 
         } catch (error) {
-            console.error(`[Agent] Erreur itération ${iteration + 1}:`, error);
+            console.error(`[Agent] Erreur itération ${iterationsRun}:`, error);
             steps.push(`⚠️ Erreur: ${error instanceof Error ? error.message : 'Inconnue'}`);
-            // On s'assure d'avoir au moins les chunks dédupliqués jusqu'ici
             allChunks = mergeAndDedupeChunks(allChunks);
+
+            // ✅ Erreur structurelle (planQuestion/executePlan ont throw,
+            // pas juste un outil individuel qui échoue — voir executor.ts
+            // où chaque outil est déjà catché en SearchError et renvoyé
+            // comme ToolResult.error, sans jamais propager jusqu'ici).
+            // Si on n'a *aucun* chunk de secours d'une itération précédente,
+            // il n'y a rien à présenter à l'étape finale : on retourne tout
+            // de suite une réponse d'erreur structurée plutôt que de
+            // continuer vers un refinePrompt vide. S'il reste des chunks
+            // d'une itération antérieure, on garde le comportement actuel
+            // (on continue vers l'étape finale avec ce qu'on a).
+            if (allChunks.length === 0) {
+                return handleAgentError(
+                    new AgentError(
+                        error instanceof Error ? error.message : String(error),
+                        'search',
+                        true
+                    )
+                );
+            }
             break;
         }
 
         iteration++;
     }
 
-    console.log(`[Agent] Fin. ${allChunks.length} chunks`);
+    console.log(`[Agent] Fin. ${allChunks.length} chunks après ${iterationsRun} itération(s)`);
 
     console.log('[Agent] Étape finale');
-    // ✅ FINAL_CHUNKS_LIMIT (8) au lieu de 3 — on exploite enfin
-    // le travail fait par la boucle ReAct sur plusieurs itérations.
     const refinePrompt = buildUserPrompt(
         question,
         draft,
@@ -213,13 +228,26 @@ export async function runAgent(
     try {
         finalResult = await callWithFallback(refinePrompt, SYSTEM_PROMPT);
     } catch (error) {
-        // ✅ callWithFallback ne devrait normalement pas throw (il catch déjà
-        // les erreurs retryables et renvoie null), mais si jamais une erreur
-        // non-retryable remonte, on la transforme en LLMError exploitable.
         return handleAgentError(new LLMError(error instanceof Error ? error.message : String(error)));
     }
 
     if (!finalResult) {
+        // ✅ Double échec LLM (draft à l'étape 1 ET réponse finale) : à ce
+        // stade, retenter generateFallbackAnswer ne ferait qu'utiliser un
+        // `draft` vide de toute façon (cf. son fallback "Aucun document
+        // trouvé... Impossible de générer une réponse"). Si on a des
+        // chunks, buildRagOnlyResponse donne une réponse plus utile et
+        // mieux formatée (extraits avec liens/pertinence) que de repasser
+        // par generateFallbackAnswer avec un draft vide.
+        if (!draft && allChunks.length > 0) {
+            console.warn('[Agent] Draft ET réponse finale indisponibles, réponse RAG seule');
+            const ragOnly = buildRagOnlyResponse(allChunks);
+            if (toolErrors.length > 0) {
+                ragOnly.thinking_summary.steps.push(...toolErrors);
+            }
+            return ragOnly;
+        }
+
         console.warn('[Agent] LLM indisponible, fallback');
         const fallback = generateFallbackAnswer(question, allChunks, draft);
         if (toolErrors.length > 0) {
@@ -232,7 +260,7 @@ export async function runAgent(
     parsed.model_used = finalResult.model;
     parsed.thinking_summary.steps = [
         ...steps,
-        `${iteration} itérations`,
+        `${iterationsRun} itération(s)`,
         ...parsed.thinking_summary.steps,
     ];
 
@@ -263,14 +291,10 @@ export async function runAgentGemini(
 
     console.log('[AgentGemini] Exécution');
     const searchResult = await executeGeminiDecisions(toolCalls);
-    const chunks = searchResult.chunks;
+    const chunks = mergeAndDedupeChunks(searchResult.chunks);
     console.log(`[AgentGemini] ${chunks.length} chunks`);
 
     console.log('[AgentGemini] Réponse finale');
-    // ✅ Même correction ici : FINAL_CHUNKS_LIMIT au lieu de tout passer
-    // sans limite explicite (avant: "chunks" complet, jusqu'à 20 — ce qui
-    // pouvait au contraire être TROP gros pour le prompt selon les cas).
-    // On harmonise les deux agents sur la même limite.
     const refinePrompt = buildUserPrompt(question, draft, chunks.slice(0, FINAL_CHUNKS_LIMIT));
 
     let finalResult;
@@ -281,6 +305,14 @@ export async function runAgentGemini(
     }
 
     if (!finalResult) {
+        // ✅ Voir runAgent pour le raisonnement complet : double échec LLM
+        // (draft + réponse finale) avec des chunks disponibles → réponse
+        // RAG seule, mieux formatée qu'un fallback avec draft vide.
+        if (!draft && chunks.length > 0) {
+            console.warn('[AgentGemini] Draft ET réponse finale indisponibles, réponse RAG seule');
+            return buildRagOnlyResponse(chunks);
+        }
+
         console.warn('[AgentGemini] LLM indisponible, fallback');
         return generateFallbackAnswer(question, chunks, draft);
     }
@@ -292,6 +324,5 @@ export async function runAgentGemini(
         `Raisonnement: ${reasoning}`,
         ...parsed.thinking_summary.steps,
     ];
-    console.log("[Agent] Parsed =", JSON.stringify(parsed, null, 2));
     return parsed;
 }

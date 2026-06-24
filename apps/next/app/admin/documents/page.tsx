@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Eye,
   File,
@@ -37,11 +39,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { 
-  fetchDocuments as fetchDocumentsApi, 
-  deleteDocument as deleteDocumentApi, 
-  fetchDocumentSegments as fetchDocumentSegmentsApi 
-} from "@/lib/api/admin";
 
 type DocumentItem = {
   id: string;
@@ -56,6 +53,7 @@ type Notice = { message: string; type: "success" | "error" | "info" };
 type FileFilter = "all" | "pdf" | "text";
 
 const ITEMS_PER_PAGE = 10;
+const PREVIEW_SEGMENTS = 5;
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("fr-TN", {
@@ -113,6 +111,7 @@ export default function AdminDocumentsPage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [segments, setSegments] = useState<string[]>([]);
+  const [showAllSegments, setShowAllSegments] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FileFilter>("all");
   const [loading, setLoading] = useState(true);
@@ -122,6 +121,8 @@ export default function AdminDocumentsPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [segmentError, setSegmentError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
 
   const noticeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -133,12 +134,15 @@ export default function AdminDocumentsPage() {
 
   useEffect(() => () => { if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current); }, []);
 
-  const loadDocuments = useCallback(
+  const fetchDocuments = useCallback(
     async (silent = false) => {
       silent ? setRefreshing(true) : setLoading(true);
       try {
-        const data = await fetchDocumentsApi();
-        setDocuments(data);
+        const res = await fetch("/api/admin/document-ref");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
+        const docs = Array.isArray(data) ? data : data.documents ?? [];
+        setDocuments(docs);
         setCurrentPage(1);
       } catch (err) {
         showNotice(err instanceof Error ? err.message : "Erreur de chargement", "error");
@@ -150,14 +154,14 @@ export default function AdminDocumentsPage() {
     [showNotice],
   );
 
-  useEffect(() => { void loadDocuments(); }, [loadDocuments]);
+  useEffect(() => { void fetchDocuments(); }, [fetchDocuments]);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const matchesQuery =
-        doc.filename.toLowerCase().includes(query.toLowerCase()) ||
-        doc.id.toLowerCase().includes(query.toLowerCase());
-      const type = getDocumentType(doc.filename);
+        doc.filename?.toLowerCase().includes(query.toLowerCase()) ||
+        doc.id?.toLowerCase().includes(query.toLowerCase());
+      const type = getDocumentType(doc.filename || '');
       return matchesQuery && (filter === "all" || type === filter);
     });
   }, [documents, filter, query]);
@@ -174,33 +178,55 @@ export default function AdminDocumentsPage() {
   const closeSegments = useCallback(() => {
     setSelectedDocument(null);
     setSegments([]);
+    setShowAllSegments(false);
     setSegmentError(null);
   }, []);
 
   const openSegments = useCallback(async (doc: DocumentItem) => {
+    if (selectedDocument?.id === doc.id) {
+      closeSegments();
+      return;
+    }
+
     setSelectedDocument(doc);
     setSegments([]);
+    setShowAllSegments(false);
     setSegmentsLoading(true);
     setSegmentError(null);
 
     try {
-      const data = await fetchDocumentSegmentsApi(doc.id);
-      setSegments(data.segments);
-      if (data.segments.length === 0) {
-        setSegmentError("Aucun segment disponible pour ce document");
+      const res = await fetch(`/api/admin/document-ref/${doc.id}/segments`);
+      const text = await res.text();
+      if (!text.trim()) {
+        setSegmentError("Aucune donnée retournée par l'API");
+        return;
       }
+      const data = JSON.parse(text);
+      if (!res.ok) {
+        setSegmentError(data.error ?? `Erreur ${res.status}`);
+        return;
+      }
+      const list: string[] = data.segments ?? (Array.isArray(data) ? data : data.data ?? []);
+      setSegments(list);
+      if (list.length === 0) setSegmentError("Aucun segment disponible pour ce document");
     } catch (err) {
       setSegmentError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setSegmentsLoading(false);
     }
-  }, []);
+  }, [selectedDocument, closeSegments]);
 
-  const handleDeleteDocument = async (doc: DocumentItem) => {
+  const deleteDocument = async (doc: DocumentItem) => {
     if (!confirm(`Supprimer "${doc.filename}" et ses ${doc.segmentCount} segments ?`)) return;
     setDeletingId(doc.id);
     try {
-      await deleteDocumentApi(doc.id);
+      const res = await fetch("/api/admin/document-ref", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: doc.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Suppression impossible");
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
       if (selectedDocument?.id === doc.id) {
         closeSegments();
@@ -217,6 +243,16 @@ export default function AdminDocumentsPage() {
     await navigator.clipboard.writeText(id).catch(() => {});
     showNotice("Identifiant copié", "success");
   };
+
+  const stats = useMemo(() => ({
+    total: documents.length,
+    segments: documents.reduce((s, d) => s + (d.segmentCount || 0), 0),
+    pdf: documents.filter(d => d.filename?.toLowerCase().endsWith('.pdf')).length,
+    text: documents.filter(d => d.filename?.toLowerCase().endsWith('.txt') || d.filename?.toLowerCase().endsWith('.md')).length,
+  }), [documents]);
+
+  const displayedSegments = showAllSegments ? segments : segments.slice(0, PREVIEW_SEGMENTS);
+  const hasMoreSegments = segments.length > PREVIEW_SEGMENTS;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -242,18 +278,19 @@ export default function AdminDocumentsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between border-b bg-background px-6 py-4">
+      {/* En-tête */}
+      <header className="flex items-center justify-between border-b bg-background px-6 py-4">
         <div>
           <h1 className="text-base font-medium">Documents indexés</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {documents.length} source(s) · {documents.reduce((s, d) => s + d.segmentCount, 0).toLocaleString("fr-FR")} segments au total
+            {stats.total} source(s) · {stats.segments.toLocaleString("fr-FR")} segments · {stats.pdf} PDF · {stats.text} texte
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => loadDocuments(true)}
+            onClick={() => fetchDocuments(true)}
             disabled={refreshing}
           >
             <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
@@ -261,18 +298,91 @@ export default function AdminDocumentsPage() {
           </Button>
           <Button size="sm" asChild>
             <Link href="/admin/documents/upload">
-              <Upload className="size-3.5 mr-1.5" />
+              <Upload className="size-3.5" />
               Importer
             </Link>
           </Button>
         </div>
-      </div>
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
+        {/* Colonne principale */}
         <div className={cn(
-          "flex flex-1 flex-col gap-5 overflow-y-auto p-6 transition-all duration-300",
+          "flex-1 overflow-y-auto p-6 transition-all duration-300",
           selectedDocument ? "xl:pr-2" : ""
         )}>
+          {/* Cartes statistiques */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            {[
+              { 
+                title: "Total", 
+                value: stats.total, 
+                increase: `${stats.total} document(s)`,
+                icon: FileText,
+                delay: "0ms",
+              },
+              { 
+                title: "Segments", 
+                value: stats.segments,
+                increase: `${stats.segments.toLocaleString("fr-FR")} segments`,
+                icon: File,
+                delay: "100ms",
+              },
+              { 
+                title: "PDF", 
+                value: stats.pdf,
+                subtitle: stats.pdf > 0 ? `${Math.round((stats.pdf / (stats.total || 1)) * 100)}% du total` : "Aucun PDF",
+                icon: FileText,
+                delay: "200ms",
+              },
+              { 
+                title: "Texte", 
+                value: stats.text,
+                subtitle: stats.text > 0 ? `${Math.round((stats.text / (stats.total || 1)) * 100)}% du total` : "Aucun texte",
+                icon: File,
+                delay: "300ms",
+              },
+            ].map((stat, index) => {
+              const Icon = stat.icon;
+              const isPrimary = index === 0;
+              
+              return (
+                <Card
+                  key={stat.title}
+                  onMouseEnter={() => setHoveredCard(index)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{ animationDelay: stat.delay }}
+                  className={cn(
+                    "p-4 transition-all duration-500 ease-out animate-slide-in-up cursor-pointer",
+                    isPrimary ? "bg-primary text-primary-foreground" : "bg-card text-foreground",
+                    hoveredCard === index ? "scale-105 shadow-2xl" : "shadow-lg"
+                  )}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-xs font-medium opacity-90">{stat.title}</h3>
+                    <div
+                      className={cn(
+                        "w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-300",
+                        isPrimary ? "bg-primary-foreground/20" : "bg-primary",
+                        hoveredCard === index ? "rotate-45" : ""
+                      )}
+                    >
+                      <Icon className={cn(
+                        "w-3 h-3",
+                        isPrimary ? "text-primary-foreground" : "text-primary-foreground"
+                      )} />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold mb-2">{stat.value}</p>
+                  <div className="flex items-center gap-1.5 text-xs opacity-80">
+                    {stat.increase && <span>{stat.increase}</span>}
+                    {stat.subtitle && <span>{stat.subtitle}</span>}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">Sources disponibles</CardTitle>
@@ -281,6 +391,7 @@ export default function AdminDocumentsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Filtres */}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -294,7 +405,7 @@ export default function AdminDocumentsPage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="shrink-0">
-                      <Filter className="size-3.5 mr-1" />
+                      <Filter className="size-3.5" />
                       {filter === "all" ? "Tous" : filter === "pdf" ? "PDF" : "Texte"}
                     </Button>
                   </DropdownMenuTrigger>
@@ -308,6 +419,7 @@ export default function AdminDocumentsPage() {
                 </DropdownMenu>
               </div>
 
+              {/* Tableau */}
               <div className="overflow-hidden rounded-lg border">
                 <div className="hidden grid-cols-[1fr_80px_70px_90px_36px] border-b bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
                   <span>Document</span>
@@ -333,14 +445,15 @@ export default function AdminDocumentsPage() {
                   </div>
                 ) : (
                   paginatedDocuments.map((doc, idx) => {
-                    const Icon = getFileIcon(doc.filename);
+                    const Icon = getFileIcon(doc.filename || '');
+                    const isSelected = selectedDocument?.id === doc.id;
                     return (
                       <div
                         key={doc.id}
                         className={cn(
                           "grid gap-2 px-3 py-2.5 transition-colors hover:bg-muted/20 md:grid-cols-[1fr_80px_70px_90px_36px] md:items-center",
                           idx !== paginatedDocuments.length - 1 && "border-b",
-                          selectedDocument?.id === doc.id && "bg-primary/5"
+                          isSelected && "bg-primary/5"
                         )}
                       >
                         <button
@@ -349,15 +462,15 @@ export default function AdminDocumentsPage() {
                           className="flex min-w-0 items-center gap-2.5 text-left"
                         >
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
-                            <Icon className={cn("size-4", getFileColorClass(doc.filename))} />
+                            <Icon className={cn("size-4", getFileColorClass(doc.filename || ''))} />
                           </div>
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium">
-                              {doc.filename}
+                              {doc.filename || 'Sans nom'}
                             </span>
                             <span className="flex items-center gap-1.5">
                               <span className="block text-[11px] text-muted-foreground">
-                                {doc.id.slice(0, 8)}…
+                                {doc.id?.slice(0, 8) || '…'}
                               </span>
                               {doc.status && <StatusBadge status={doc.status} />}
                             </span>
@@ -365,13 +478,13 @@ export default function AdminDocumentsPage() {
                         </button>
 
                         <span className="w-fit rounded border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground md:mx-auto">
-                          {doc.segmentCount}
+                          {doc.segmentCount || 0}
                         </span>
                         <span className="text-xs text-muted-foreground md:text-center">
                           {doc.fileSize ? formatFileSize(doc.fileSize) : "—"}
                         </span>
                         <span className="text-xs text-muted-foreground md:text-center">
-                          {formatDate(doc.createdAt)}
+                          {doc.createdAt ? formatDate(doc.createdAt) : "—"}
                         </span>
 
                         <DropdownMenu>
@@ -382,18 +495,18 @@ export default function AdminDocumentsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
                             <DropdownMenuItem onClick={() => void openSegments(doc)}>
-                              <Eye className="size-4 mr-2" /> Voir les segments
+                              <Eye className="size-4" /> Voir les segments
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => void copyId(doc.id)}>
-                              <Copy className="size-4 mr-2" /> Copier l'identifiant
+                              <Copy className="size-4" /> Copier l'identifiant
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               variant="destructive"
                               disabled={deletingId === doc.id}
-                              onClick={() => void handleDeleteDocument(doc)}
+                              onClick={() => void deleteDocument(doc)}
                             >
-                              <Trash2 className="size-4 mr-2" /> Supprimer
+                              <Trash2 className="size-4" /> Supprimer
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -403,6 +516,7 @@ export default function AdminDocumentsPage() {
                 )}
               </div>
 
+              {/* Pagination */}
               {!loading && totalPages > 1 && (
                 <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
                   <span>
@@ -434,20 +548,21 @@ export default function AdminDocumentsPage() {
           </Card>
         </div>
 
+        {/* Panneau latéral des segments */}
         {selectedDocument && (
-          <aside className="w-80 flex-shrink-0 border-l animate-in slide-in-from-right duration-300 xl:flex xl:flex-col">
+          <aside className="w-96 flex-shrink-0 border-l animate-in slide-in-from-right duration-300 xl:flex xl:flex-col">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
-                <p className="text-sm font-medium">Aperçu des segments</p>
+                <p className="text-sm font-medium">Segments</p>
                 <p className="text-xs text-muted-foreground">
-                  {segments.length} segment(s)
+                  {selectedDocument.filename}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 onClick={closeSegments}
-                aria-label="Fermer l'aperçu"
+                aria-label="Fermer"
               >
                 <X className="size-4" />
               </Button>
@@ -455,17 +570,21 @@ export default function AdminDocumentsPage() {
 
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-3">
+                {/* Informations du document */}
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <p className="truncate text-sm font-medium">{selectedDocument.filename}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {selectedDocument.id.slice(0, 16)}… · {selectedDocument.segmentCount} segments
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    Importé le {formatDate(selectedDocument.createdAt)}
+                  </p>
                 </div>
 
                 {segmentError && (
-                  <p className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
                     {segmentError}
-                  </p>
+                  </div>
                 )}
 
                 {segmentsLoading ? (
@@ -480,17 +599,62 @@ export default function AdminDocumentsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {segments.slice(0, 20).map((seg, i) => (
-                      <div
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {segments.length} segment(s) trouvé(s)
+                    </p>
+
+                    {displayedSegments.map((seg, i) => (
+                      <Card
                         key={`${selectedDocument.id}-${i}`}
-                        className="rounded-lg border bg-background p-3"
+                        onMouseEnter={() => setHoveredSegment(i)}
+                        onMouseLeave={() => setHoveredSegment(null)}
+                        className={cn(
+                          "p-3 transition-all duration-300 ease-out cursor-pointer shadow-sm hover:shadow-lg",
+                          hoveredSegment === i ? "scale-[1.02] shadow-md" : ""
+                        )}
                       >
-                        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Segment {i + 1}
+                        <div className="flex items-start justify-between mb-1">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Segment {i + 1}
+                          </p>
+                          <div
+                            className={cn(
+                              "w-4 h-4 rounded-full flex items-center justify-center transition-transform duration-300",
+                              "bg-primary/10",
+                              hoveredSegment === i ? "scale-110" : ""
+                            )}
+                          >
+                            <span className="text-[8px] font-medium text-primary">
+                              {i + 1}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">
+                          {typeof seg === 'string' ? seg : JSON.stringify(seg)}
                         </p>
-                        <p className="line-clamp-4 text-xs text-muted-foreground">{seg}</p>
-                      </div>
+                      </Card>
                     ))}
+
+                    {hasMoreSegments && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setShowAllSegments(!showAllSegments)}
+                      >
+                        {showAllSegments ? (
+                          <>
+                            <ChevronUp className="size-3.5 mr-1" />
+                            Voir moins ({PREVIEW_SEGMENTS} premiers)
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="size-3.5 mr-1" />
+                            Voir tous les segments ({segments.length})
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

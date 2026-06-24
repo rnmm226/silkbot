@@ -620,9 +620,12 @@ export async function sendMessage(to: string, subject: string, content: string):
 
 // ============ FONCTIONS UPLOAD ============
 
-export async function uploadDocument(file: File): Promise<any> {
+// lib/api/admin.ts
+
+export async function uploadDocument(file: File, sourceType: string = "jort"): Promise<any> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("sourceType", sourceType); // ✅ Ajout du type de source
 
   const res = await fetch("/api/admin/document-ref/upload", {
     method: "POST",

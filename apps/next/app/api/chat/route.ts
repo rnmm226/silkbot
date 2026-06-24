@@ -8,7 +8,12 @@ import { runAgent, runAgentGemini } from "./agent";
 import { checkApiConnection } from "./tools";
 import type { GeminiStructuredResponse } from "./types";
 
-const REQUEST_TIMEOUT = 60000;
+// ✅ Augmenté de 60s à 120s : avec MAX_ITERATIONS=3 dans agent.ts, le
+// pipeline ReAct peut enchaîner jusqu'à ~8 appels LLM (draft, planner ×3,
+// décision ×3, réponse finale) sur des modèles de raisonnement comme
+// gemini-3.5-flash, qui sont plus lents par appel que les anciens flash.
+// 60s était trop juste même sans aucun gaspillage de retry.
+const REQUEST_TIMEOUT = 120000;
 
 function getMessageText(message: UIMessage): string {
   const textPart = message.parts?.find(

@@ -10,6 +10,7 @@ import psycopg
 from sentence_transformers import SentenceTransformer
 
 import os
+import glob
 import json
 import fitz
 import uuid
@@ -35,7 +36,18 @@ print("3️⃣ MODEL LOADED")
 DB_URL = "postgresql://postgres:secret123@localhost:5432/monapp"
 CHUNK_SIZE = 100
 
-os.makedirs("./docs", exist_ok=True)
+# Chemin ancré sur l'emplacement du script, peu importe le CWD au lancement
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOCS_DIR = os.path.join(BASE_DIR, "docs")
+DOWNLOADED_JORT_DIR = os.path.join(BASE_DIR, "downloaded_jort_pdfs")
+DOWNLOADED_PDFS_DIR = os.path.join(BASE_DIR, "downloaded_pdfs")
+DOWNLOADED_PACIOLI_DIR = os.path.join(BASE_DIR, "downloaded_pacioli_pdfs")
+
+os.makedirs(DOCS_DIR, exist_ok=True)
+os.makedirs(DOWNLOADED_JORT_DIR, exist_ok=True)
+os.makedirs(DOWNLOADED_PDFS_DIR, exist_ok=True)
+os.makedirs(DOWNLOADED_PACIOLI_DIR, exist_ok=True)
+
 print("4️⃣ DOCS FOLDER READY")
 
 
@@ -46,6 +58,36 @@ print("4️⃣ DOCS FOLDER READY")
 def chunk_text(text: str, size=CHUNK_SIZE):
     words = text.split()
     return [" ".join(words[i:i + size]) for i in range(0, len(words), size)]
+
+
+def find_file(root_dir, filename, exact_match=True):
+    """
+    Search for a file in a directory and its subdirectories.
+
+    :param root_dir: The starting directory path (string)
+    :param filename: The file name or partial name to search for (string)
+    :param exact_match: If True, match exact filename; if False, match if filename contains the search term
+    :return: List of full file paths found
+    """
+    if not isinstance(root_dir, str) or not isinstance(filename, str):
+        raise TypeError("Both root_dir and filename must be strings.")
+    if not os.path.isdir(root_dir):
+        raise FileNotFoundError(f"Directory not found: {root_dir}")
+    if not filename.strip():
+        raise ValueError("Filename cannot be empty.")
+
+    matches = []
+    try:
+        for dirpath, _, files in os.walk(root_dir):
+            for file in files:
+                if (exact_match and file == filename) or (not exact_match and filename in file):
+                    matches.append(os.path.join(dirpath, file))
+    except PermissionError as e:
+        print(f"Permission denied: {e}")
+    except Exception as e:
+        print(f"Error while searching: {e}")
+
+    return matches
 
 
 # ─────────────────────────────
@@ -150,7 +192,7 @@ async def upload(file: UploadFile = File(...)):
     print("🆔 GENERATED doc_id:", doc_id)
 
     ext = ".pdf" if file.content_type == "application/pdf" else ".txt"
-    file_path = f"./docs/{doc_id}{ext}"
+    file_path = os.path.join(DOCS_DIR, f"{doc_id}{ext}")
 
     print("💾 saving to:", file_path)
 
@@ -287,17 +329,39 @@ class DocumentRequest(BaseModel):
 
 @app.get("/document/{doc_id}")
 async def get_document(doc_id: str):
+    """Récupère le fichier original d'un document (PDF/txt)"""
     print("📄 REQUEST DOC_ID:", doc_id)
-    import glob
 
-    files = glob.glob(f"./docs/{doc_id}.*")
+    search_dirs = [DOWNLOADED_JORT_DIR, DOWNLOADED_PDFS_DIR, DOWNLOADED_PACIOLI_DIR]
+
+    # 1) Chercher le filename en DB, puis le fichier dans les dossiers connus
+    conn = psycopg.connect(DB_URL)
+    cur = conn.cursor()
+    cur.execute('SELECT filename FROM "SourceDocument" WHERE id = %s', (doc_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if row:
+        filename = row[0]
+        for root_dir in search_dirs:
+            if not os.path.isdir(root_dir):
+                continue
+            results = find_file(root_dir, filename, exact_match=True)
+            if results:
+                print("✅ FOUND:", results[0])
+                return FileResponse(results[0])
+
+    # 2) Fallback : fichier uploadé directement, stocké sous DOCS_DIR/{doc_id}.*
+    files = glob.glob(os.path.join(DOCS_DIR, f"{doc_id}.*"))
     print("📁 MATCHED FILES:", files)
 
     if not files:
         print("❌ NOT FOUND")
         raise HTTPException(404, "Document non trouvé")
 
-    return FileResponse(files[0])
+    file_path = files[0]
+    media_type = "application/pdf" if file_path.endswith(".pdf") else "text/plain"
+    return FileResponse(file_path, media_type=media_type)
 
 
 @app.post("/search")

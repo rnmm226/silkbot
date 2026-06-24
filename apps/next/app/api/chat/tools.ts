@@ -2,19 +2,22 @@
 import type { SearchResponse, RagChunk } from './types';
 
 const API_URL =
+  process.env.PYTHON_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000";
+  "http://localhost:5001";
 
 const DEFAULT_TIMEOUT = 10000;
 const MAX_RETRIES = 2;
-// ✅ TTL du cache d'endpoints : 60 secondes.
-// Avant : le cache ne s'invalidait jamais après le premier check,
-// donc un endpoint qui redevenait disponible après un redémarrage
-// du backend Python restait marqué "indisponible" jusqu'au redémarrage
-// du serveur Next.js.
 const ENDPOINT_CACHE_TTL_MS = 60_000;
 
-// ── Helpers ──────────────────────────────────────────────────────
+export const QUERY_TOOLS = [
+  'semantic_search',
+  'article_search',
+  'tag_search',
+  'document_search',
+  'hybrid_search',
+  'smart_search',
+] as const;
 
 async function fetchWithTimeout(
   url: string,
@@ -66,10 +69,6 @@ async function fetchWithRetry(
   throw lastError || new Error('Toutes les tentatives ont échoué');
 }
 
-// ── Cache des endpoints (avec TTL) ──────────────────────────────
-
-// ✅ On stocke désormais { available, checkedAt } au lieu d'un simple
-// booléen, pour pouvoir invalider l'entrée après ENDPOINT_CACHE_TTL_MS.
 interface EndpointCacheEntry {
   available: boolean;
   checkedAt: number;
@@ -92,7 +91,7 @@ async function checkEndpoint(endpoint: string): Promise<boolean> {
     });
     const available = response.ok || response.status === 405;
     endpointCache[endpoint] = { available, checkedAt: now };
-    console.log(`[checkEndpoint] ${endpoint}: ${available ? '✅' : '❌'} (cache ${ENDPOINT_CACHE_TTL_MS / 1000}s)`);
+    console.log(`[checkEndpoint] ${endpoint}: ${available ? '✅' : '❌'}`);
     return available;
   } catch {
     endpointCache[endpoint] = { available: false, checkedAt: now };
@@ -100,20 +99,64 @@ async function checkEndpoint(endpoint: string): Promise<boolean> {
   }
 }
 
-// ── Outils de recherche ─────────────────────────────────────────
-
-export async function semantic_search(query: string): Promise<SearchResponse> {
+export async function semantic_search(query: string, topK: number = 5): Promise<SearchResponse> {
   try {
     console.log(`[semantic_search] 🔍 Recherche: "${query}"`);
-    const data = await fetchWithRetry(`${API_URL}/search`, {
+    console.log(`[semantic_search] 📡 URL: ${API_URL}/search`);
+
+    const response = await fetchWithTimeout(`${API_URL}/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: query }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // ✅ Corrigé : l'API Python attend "question", pas "query" — l'ancien
+      // body provoquait un 422 systématique ("Field required": question),
+      // donc semantic_search renvoyait toujours 0 chunks, peu importe le LLM.
+      body: JSON.stringify({
+        question: query,
+        top_k: topK
+      }),
+      cache: 'no-store',
     });
 
-    const chunks = data.chunks || [];
-    console.log(`[semantic_search] ✅ ${chunks.length} chunks trouvés`);
+    console.log(`[semantic_search] 📡 Status: ${response.status}`);
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[semantic_search] ❌ Erreur ${response.status}: ${text}`);
+      return { chunks: [] };
+    }
+
+    const data = await response.json();
+
+    // ✅ Corrigé : l'API Python renvoie les résultats sous la clé "chunks",
+    // pas "results" — data.results était toujours undefined, donc cette
+    // fonction retournait systématiquement { chunks: [] } même quand l'API
+    // trouvait de vrais résultats (confirmé via test direct de l'API :
+    // réponse { chunks: [...], context: "..." }).
+    console.log(`[semantic_search] ✅ ${data.chunks?.length || 0} résultats`);
+
+    if (!data.chunks || data.chunks.length === 0) {
+      console.warn('[semantic_search] ⚠️ Aucun résultat');
+      return { chunks: [] };
+    }
+
+    // ✅ Corrigé : r.page_number → r.page (le champ réel renvoyé par l'API).
+    // Les autres noms de champs (chunk_id, content, similarity, filename,
+    // document_id) étaient déjà corrects.
+    const chunks: RagChunk[] = data.chunks.map((r: any) => ({
+      chunk_id: r.chunk_id || `chunk-${Math.random()}`,
+      content: r.content || '',
+      page: r.page ?? 1,
+      similarity: r.similarity || 0,
+      filename: r.filename || 'unknown.pdf',
+      source_type: r.source || 'jort',
+      source_url: r.source_url || null,
+      document_id: r.document_id || null,
+    }));
+
     return { chunks };
+
   } catch (error) {
     console.error('[semantic_search] ❌ Erreur:', error);
     return { chunks: [] };
@@ -123,40 +166,50 @@ export async function semantic_search(query: string): Promise<SearchResponse> {
 export async function smart_search(query: string): Promise<SearchResponse> {
   console.log(`[smart_search] 🔍 Recherche intelligente: "${query}"`);
 
-  const endpoints = ['/search', '/search/articles', '/search/tags'];
-  const available = await Promise.all(endpoints.map(e => checkEndpoint(e)));
-
-  const results: RagChunk[] = [];
-
-  for (let i = 0; i < endpoints.length; i++) {
-    if (available[i]) {
-      try {
-        const res = await fetch(`${API_URL}${endpoints[i]}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: query }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const chunks = data.chunks || [];
-          results.push(...chunks);
-          console.log(`[smart_search] ✅ ${endpoints[i]}: ${chunks.length} chunks`);
-        }
-      } catch (error) {
-        console.warn(`[smart_search] ⚠️ ${endpoints[i]} a échoué`);
-      }
+  try {
+    const result = await semantic_search(query, 20);
+    if (result.chunks && result.chunks.length > 0) {
+      console.log(`[smart_search] ✅ ${result.chunks.length} résultats via semantic_search`);
+      return result;
     }
+  } catch (error) {
+    console.warn('[smart_search] ⚠️ semantic_search a échoué:', error);
   }
 
-  if (results.length === 0) {
-    console.log('[smart_search] ⚠️ Aucun résultat, fallback vers semantic_search');
-    return semantic_search(query);
+  const endpoints = ['/search/articles', '/search/tags'];
+  const results: RagChunk[] = [];
+
+  for (const endpoint of endpoints) {
+    const isAvailable = await checkEndpoint(endpoint);
+    if (!isAvailable) {
+      console.log(`[smart_search] ⏭️ ${endpoint} ignoré (indisponible récemment)`);
+      continue;
+    }
+
+    try {
+      const response = await fetchWithTimeout(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: query }),
+        cache: 'no-store',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const chunks = data.chunks || [];
+        results.push(...chunks);
+        console.log(`[smart_search] ✅ ${endpoint}: ${chunks.length} chunks`);
+      }
+    } catch (error) {
+      console.warn(`[smart_search] ⚠️ ${endpoint} a échoué`);
+    }
   }
 
   const unique = results.filter(
     (chunk, index, self) =>
       index === self.findIndex(c => c.chunk_id === chunk.chunk_id)
   );
+
   unique.sort((a, b) => b.similarity - a.similarity);
 
   console.log(`[smart_search] ✅ ${unique.length} chunks uniques`);
@@ -164,18 +217,18 @@ export async function smart_search(query: string): Promise<SearchResponse> {
 }
 
 export async function article_search(query: string): Promise<SearchResponse> {
-  console.log(`[article_search] 🔍 Fallback vers smart_search pour: "${query}"`);
+  console.log(`[article_search] 🔍 Recherche article: "${query}"`);
   return smart_search(`article loi ${query}`);
 }
 
 export async function tag_search(query: string): Promise<SearchResponse> {
-  console.log(`[tag_search] 🔍 Fallback vers smart_search pour: "${query}"`);
+  console.log(`[tag_search] 🔍 Recherche tags: "${query}"`);
   const tags = query.split(',').map(t => t.trim()).join(' ');
   return smart_search(tags);
 }
 
 export async function document_search(query: string): Promise<SearchResponse> {
-  console.log(`[document_search] 🔍 Fallback vers smart_search pour: "${query}"`);
+  console.log(`[document_search] 🔍 Recherche document: "${query}"`);
   return smart_search(`document ${query}`);
 }
 
@@ -206,11 +259,9 @@ export async function get_page(pageId: string): Promise<SearchResponse> {
 }
 
 export async function hybrid_search(query: string): Promise<SearchResponse> {
-  console.log(`[hybrid_search] 🔍 Recherche hybride pour: "${query}"`);
+  console.log(`[hybrid_search] 🔍 Recherche hybride: "${query}"`);
   return smart_search(query);
 }
-
-// ── Map des outils ──────────────────────────────────────────────
 
 export const toolMap: Record<string, (query: string) => Promise<SearchResponse>> = {
   semantic_search,
@@ -233,7 +284,12 @@ export const TOOL_DESCRIPTIONS = `
 - hybrid_search: Recherche combinée (sémantique + articles + tags).
 - smart_search: Recherche intelligente qui s'adapte aux endpoints disponibles.
 `;
+const PLANNER_EXCLUDED_TOOLS = ['get_document', 'get_page'];
 
+export const QUERY_TOOL_DESCRIPTIONS = TOOL_DESCRIPTIONS
+  .split('\n')
+  .filter(line => !PLANNER_EXCLUDED_TOOLS.some(tool => line.includes(`- ${tool}:`)))
+  .join('\n');
 export function getToolNames(): string[] {
   return Object.keys(toolMap);
 }

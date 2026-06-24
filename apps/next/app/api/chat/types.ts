@@ -6,15 +6,23 @@ export interface RagChunk {
   page?: number | null;
   similarity: number;
   content: string;
-  source_url?: string | null; // NOUVEAU — lien direct vers l'article (ex: Luca Pacioli)
-  source_type?: 'jort' | 'jibaya' | 'luca_pacioli'; // NOUVEAU — utile pour différencier le formatage des sources
+  source_url?: string | null;
+  source_type?: 'jort' | 'jibaya' | 'luca_pacioli';
+  document_id?: string;
+}
+
+// ⚠️ Ajouté : utilisé partout dans tools.ts et gemini-tools.ts
+// (`Promise<SearchResponse>`, `result.chunks`) mais absent du fichier
+// fourni. Forme déduite de son usage réel (ex: `return { chunks }`).
+export interface SearchResponse {
+  chunks: RagChunk[];
 }
 
 export interface UsedSource {
   chunk_id: string;
   filename: string;
-  page: number | null;
-  url?: string | null; // NOUVEAU — lien vers l'article si disponible (ex: Luca Pacioli)
+  page: number | null;   // ✅ nullable — cohérent avec ce que le prompt demande réellement
+  url?: string | null;   // ✅ ajouté — sinon le lien renvoyé par Gemini est illisible en TS
   excerpt: string;
 }
 
@@ -34,24 +42,29 @@ export interface GeminiStructuredResponse {
   model_used?: string;
 }
 
+export interface ChatRequest {
+  question: string;
+  history?: { role: string; parts: { text: string }[] }[];
+}
+
+export interface ChatResponse {
+  response: GeminiStructuredResponse;
+  status: 'success' | 'fallback' | 'error';
+}
+
 export interface Plan {
   reasoning: string;
   tools: string[];
   search_query: string;
+  toolCalls?: { name: string; [key: string]: unknown }[];
 }
 
 export interface ToolResult {
   tool: string;
-  result: any;
+  // ✅ Élargi pour accepter SearchResponse directement ({ chunks: RagChunk[] }) —
+  // l'ancienne forme ({ chunks?: RagChunk[]; [key: string]: unknown }) exigeait
+  // une signature d'index que SearchResponse n'a pas, ce qui faisait échouer
+  // le type-check dans executor.ts (results.push({ tool, result })).
+  result: SearchResponse | null;
   error?: string;
-}
-
-export interface SearchResponse {
-  chunks: RagChunk[];
-}
-
-export interface DocumentResponse {
-  content: string;
-  filename: string;
-  page: number | null;
 }
