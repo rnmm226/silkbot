@@ -364,6 +364,29 @@ async def get_document(doc_id: str):
     return FileResponse(file_path, media_type=media_type)
 
 
+@app.get("/docs/{filename}")
+async def get_document_by_filename(filename: str):
+    """
+    Sert un PDF/txt directement par son nom de fichier.
+    Route attendue par le frontend (PDFViewer): /docs/{filename}#page=N
+    """
+    print("📄 REQUEST FILENAME:", filename)
+
+    search_dirs = [DOWNLOADED_JORT_DIR, DOWNLOADED_PDFS_DIR, DOWNLOADED_PACIOLI_DIR, DOCS_DIR]
+
+    for root_dir in search_dirs:
+        if not os.path.isdir(root_dir):
+            continue
+        results = find_file(root_dir, filename, exact_match=True)
+        if results:
+            print("✅ FOUND:", results[0])
+            media_type = "application/pdf" if results[0].endswith(".pdf") else "text/plain"
+            return FileResponse(results[0], media_type=media_type)
+
+    print("❌ NOT FOUND")
+    raise HTTPException(404, "Document non trouvé")
+
+
 @app.post("/search")
 async def search(req: SearchRequest):
     """Endpoint de recherche sémantique principal"""
