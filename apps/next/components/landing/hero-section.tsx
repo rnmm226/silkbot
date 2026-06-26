@@ -52,7 +52,7 @@ export function HeroSection() {
   }, []);
 
   // Effet magnet
-  const applyMagnet = useCallback((e: React.MouseEvent<HTMLAnchorElement>, ref: React.RefObject<HTMLAnchorElement>) => {
+  const applyMagnet = useCallback((e: React.MouseEvent<HTMLAnchorElement>, ref: React.RefObject<HTMLAnchorElement | null>) => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -61,7 +61,7 @@ export function HeroSection() {
     el.style.transform = `translate(${x}px, ${y}px)`;
   }, []);
 
-  const resetMagnet = useCallback((ref: React.RefObject<HTMLAnchorElement>) => {
+  const resetMagnet = useCallback((ref: React.RefObject<HTMLAnchorElement | null>) => {
     if (ref.current) ref.current.style.transform = "";
   }, []);
 

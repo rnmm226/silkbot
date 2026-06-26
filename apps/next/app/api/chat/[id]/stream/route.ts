@@ -1,5 +1,5 @@
 // app/api/chat/[id]/stream/route.ts
-import { readChat } from '@/apps/next/util/chat-store';
+import { readChat } from '@/util/chat-store';
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai';
 import { after } from 'next/server';
 import { createResumableStreamContext } from 'resumable-stream';

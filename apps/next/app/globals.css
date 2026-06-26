@@ -276,10 +276,11 @@
   animation: shineSweep 4.5s ease-in-out infinite;
   pointer-events: none;
 }
+/* styles/animations.css */
 @keyframes slide-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -287,7 +288,62 @@
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .animate-slide-in-up {
-  animation: slide-in-up 0.5s ease-out forwards;
-  opacity: 0;
+  animation: slide-in-up 0.3s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+/* styles/globals.css ou dans un fichier d'animation */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.slide-in-from-bottom-4 {
+  --tw-translate-y: 1rem;
+  animation: fadeIn 0.3s ease-out both;
+}
+/* styles/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    /* ... autres variables */
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    /* ... autres variables dark */
+  }
 }

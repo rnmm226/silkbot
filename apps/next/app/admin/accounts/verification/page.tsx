@@ -7,7 +7,7 @@ import {
   Mail,
   RefreshCw,
   Search,
-  User,
+  User as IconUser,
   UserCheck,
   Users,
   XCircle,
@@ -215,7 +215,7 @@ export default function AdminVerificationPage() {
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-yellow-100">
-                        <User className="size-4 text-yellow-600" />
+                        <IconUser className="size-4 text-yellow-600" />
                       </div>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium">

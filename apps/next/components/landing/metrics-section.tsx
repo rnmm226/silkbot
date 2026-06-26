@@ -247,7 +247,6 @@ export function MetricsSection() {
               En direct
             </span>
             <span className="opacity-30">|</span>
-            <span>{time.toLocaleTimeString('fr-FR')}</span>
           </div>
         </div>
         

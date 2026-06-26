@@ -22,7 +22,7 @@ function findPdfRecursive(dir: string, filename: string): string | null {
   try {
     const files = fs.readdirSync(dir);
     for (const file of files) {
-      const fullPath = path.join(dir, file);
+      const fullPath = path.join(/*turbopackIgnore: true*/ dir, file);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
         const found = findPdfRecursive(fullPath, filename);
@@ -39,10 +39,10 @@ function findPdfRecursive(dir: string, filename: string): string | null {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page');
 
@@ -77,12 +77,12 @@ export async function GET(
 
     // 3. Sinon, lire le fichier physique
     const baseFolder = SOURCE_FOLDERS[doc.source] || 'pdfs';
-    let filePath = path.join(process.cwd(), baseFolder, doc.filename);
+    let filePath = path.join(/*turbopackIgnore: true*/ process.cwd(), baseFolder, doc.filename);
 
     // Vérifier si le fichier existe
     if (!fs.existsSync(filePath)) {
       // Rechercher récursivement
-      const found = findPdfRecursive(path.join(process.cwd(), baseFolder), doc.filename);
+      const found = findPdfRecursive(path.join(/*turbopackIgnore: true*/ process.cwd(), baseFolder), doc.filename);
       if (found) {
         filePath = found;
       } else {

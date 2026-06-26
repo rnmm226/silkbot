@@ -1,5 +1,4 @@
 "use client";
-
 import { useRef, useState, useMemo, useEffect, use } from 'react';
 import { AppSidebar } from "@/components/app-sidebar";
 import { NavActions } from "@/components/nav-actions";
@@ -485,6 +484,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
   const [editInput, setEditInput] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -821,78 +821,74 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
 
         {/* Header */}
         <header
-          className="flex h-14 shrink-0 items-center gap-2 px-4"
-          style={{
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--background)',
-          }}
-        >
-          <SidebarTrigger
-            className="shrink-0"
-            style={{ color: 'var(--muted-foreground)' }}
-          />
-          <Separator orientation="vertical" className="h-4 opacity-20" />
+  className="flex h-14 shrink-0 items-center gap-2 px-4"
+  style={{
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--background)',
+  }}
+>
+  <SidebarTrigger
+    className="shrink-0"
+    style={{ color: 'var(--muted-foreground)' }}
+  />
+  <Separator orientation="vertical" className="h-4 opacity-20" />
 
-          
-            
-
-          <Breadcrumb className="flex-1 min-w-0">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>
-                  {isEditingTitle ? (
-                    <input
-                      autoFocus
-                      value={titleInput}
-                      onChange={e => setTitleInput(e.target.value)}
-                      onBlur={handleTitleSave}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleTitleSave();
-                        if (e.key === 'Escape') setIsEditingTitle(false);
-                      }}
-                      className="bg-transparent border-b focus:outline-none text-sm w-56"
-                      style={{
-                        borderColor: 'var(--primary)',
-                        color: 'var(--foreground)',
-                      }}
-                      aria-label="Titre de la conversation"
-                    />
-                  ) : (
-                    <button
-                      onClick={() => { setTitleInput(chatTitle); setIsEditingTitle(true); }}
-                      className="flex items-center gap-1.5 group transition-colors"
-                      style={{ color: 'var(--muted-foreground)' }}
-                    >
-                      <span className="font-medium text-sm truncate max-w-[220px]">{chatTitle}</span>
-                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />
-                    </button>
-                  )}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <span
-              className="hidden sm:block text-xs font-light"
+  <Breadcrumb className="flex-1 min-w-0">
+    <BreadcrumbList>
+      <BreadcrumbItem>
+        <BreadcrumbPage>
+          {isEditingTitle ? (
+            <input
+              autoFocus
+              value={titleInput}
+              onChange={e => setTitleInput(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleTitleSave();
+                if (e.key === 'Escape') setIsEditingTitle(false);
+              }}
+              className="bg-transparent border-b focus:outline-none text-sm w-56"
+              style={{
+                borderColor: 'var(--primary)',
+                color: 'var(--foreground)',
+              }}
+              aria-label="Titre de la conversation"
+            />
+          ) : (
+            <button
+              onClick={() => { setTitleInput(chatTitle); setIsEditingTitle(true); }}
+              className="flex items-center gap-1.5 group transition-colors"
               style={{ color: 'var(--muted-foreground)' }}
             >
-              {data?.user?.name}
-            </span>
-            <AlertDialogWithMedia />
-            <NavActions
-              chatTitle={chatTitle}
-              onRename={() => {
-                setTitleInput(chatTitle);
-                setIsEditingTitle(true);
-              }}
-              onShare={handleShareChat}
-              onExportPdf={() => window.print()}
-              onDelete={handleDeleteChat}
-            />
-            
-          </div>
-        </header>
+              <span className="font-medium text-sm truncate max-w-[220px]">{chatTitle}</span>
+              <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-40 transition-opacity shrink-0" />
+            </button>
+          )}
+        </BreadcrumbPage>
+      </BreadcrumbItem>
+    </BreadcrumbList>
+  </Breadcrumb>
+
+  <div className="flex items-center gap-2 ml-auto shrink-0">
+    <span
+      className="hidden sm:block text-xs font-light"
+      style={{ color: 'var(--muted-foreground)' }}
+    >
+      {data?.user?.name}
+    </span>
+    
+    <AlertDialogWithMedia />
+    <NavActions
+      onRename={() => {
+        setTitleInput(chatTitle);
+        setIsEditingTitle(true);
+      }}
+      onShare={handleShareChat}
+      onExportPdf={() => window.print()}
+      onDelete={handleDeleteChat}
+    />
+  </div>
+</header>
 
         {/* Chat layout */}
         <div className="flex flex-col h-[calc(100vh-3.5rem)]">

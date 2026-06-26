@@ -1,7 +1,7 @@
+// app/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { Navigation } from "@/components/landing/navigation";
 import { HeroSection } from "@/components/landing/hero-section";
 import { HowItWorksSection } from "@/components/landing/how-it-works-section";
@@ -229,7 +229,7 @@ export default function Home() {
       <DevelopersSection />
 
       {/* ── Testimonials Section ── */}
-      
+      <TestimonialsSection />
 
       {/* ── Pricing Section ── */}
       <PricingSection />

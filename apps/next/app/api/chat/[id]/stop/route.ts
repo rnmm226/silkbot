@@ -1,6 +1,6 @@
 
 // app/api/chat/[id]/stop/route.ts
-import { readChat, saveChat } from '@/apps/next/util/chat-store';
+import { readChat, saveChat } from '@/util/chat-store';
 import { type UIMessage } from 'ai';
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';

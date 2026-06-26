@@ -15,7 +15,7 @@ import {
   Shield,
   Trash2,
   TrendingUp,
-  User,
+  User as IconUser,
   UserCheck,
   UserX,
   Users,
@@ -116,7 +116,7 @@ function RoleBadge({ role }: { role?: string }) {
   }
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground bg-muted/50 border">
-      <User className="size-3" />
+      <IconUser className="size-3" />
       Utilisateur
     </span>
   );
@@ -457,7 +457,7 @@ export default function AdminAccountsPage() {
                         className="flex min-w-0 items-center gap-2.5 text-left"
                       >
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <User className="size-4 text-primary" />
+                          <IconUser className="size-4 text-primary" />
                         </div>
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-medium">
@@ -577,7 +577,7 @@ export default function AdminAccountsPage() {
               <div className="space-y-4">
                 <div className="flex flex-col items-center gap-2 rounded-lg border bg-muted/20 p-4">
                   <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
-                    <User className="size-8 text-primary" />
+                    <IconUser className="size-8 text-primary" />
                   </div>
                   <p className="text-sm font-medium">{selectedAccount.name || "Sans nom"}</p>
                   <p className="text-xs text-muted-foreground">{selectedAccount.email}</p>
@@ -600,12 +600,7 @@ export default function AdminAccountsPage() {
                       <span className="text-xs text-muted-foreground">Inscrit le</span>
                       <span className="text-xs">{formatDate(selectedAccount.createdAt)}</span>
                     </div>
-                    {selectedAccount.lastLogin && (
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <span className="text-xs text-muted-foreground">Dernière connexion</span>
-                        <span className="text-xs">{formatRelativeDate(selectedAccount.lastLogin)}</span>
-                      </div>
-                    )}
+                    
                     <div className="flex items-center justify-between px-3 py-2">
                       <span className="text-xs text-muted-foreground">Statut email</span>
                       <span className="text-xs">

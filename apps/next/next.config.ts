@@ -1,8 +1,10 @@
 import path from "path";
+import type { NextConfig } from 'next';
 
-const nextConfig = {
+
+const nextConfig :NextConfig ={
   turbopack: {
-    root: path.join(__dirname, '../..'),
+    root: path.join(/*turbopackIgnore: true*/__dirname, '../..'),
   },
 
   serverExternalPackages: [
@@ -27,5 +29,5 @@ const nextConfig = {
 };
 
 
-
 export default nextConfig;
+

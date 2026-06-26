@@ -2,7 +2,7 @@
 import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const adapter = new PrismaPg({
+const adapter = new PrismaPg(process.env.DATABASE_URL ?? {
   host: process.env.DATABASE_HOST || "localhost",
   port: parseInt(process.env.DATABASE_PORT!) || 5432,
   user: process.env.DATABASE_USER || "postgres",

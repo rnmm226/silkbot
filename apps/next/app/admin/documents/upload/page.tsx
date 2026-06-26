@@ -260,10 +260,10 @@ export default function AdminUploadPage() {
                     <FileText className="size-5 text-muted-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{file.name}</p>
+                    <p className="truncate text-sm font-medium">{file?.name}</p>
                     <div className="flex items-center gap-2">
                       <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
+                        {formatFileSize(file?.size|| 0)}
                       </p>
                       <span className="text-xs text-muted-foreground">·</span>
                       <span className="text-xs font-medium text-primary">

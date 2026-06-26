@@ -9,7 +9,7 @@ import {
   CheckCircle, 
   Trash2, 
   RefreshCw,
-  Activity,
+  Activity as ActivityIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -74,7 +74,7 @@ export function RecentActivity({ limit = 10, className }: RecentActivityProps) {
       <Card className="p-6">
         <h2 className="text-xl font-semibold text-foreground mb-6">Activité récente</h2>
         <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <Activity className="size-8 text-muted-foreground" />
+          <ActivityIcon className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Impossible de charger les activités</p>
           <p className="text-xs text-muted-foreground">{error}</p>
         </div>
@@ -87,7 +87,7 @@ export function RecentActivity({ limit = 10, className }: RecentActivityProps) {
       <Card className="p-6">
         <h2 className="text-xl font-semibold text-foreground mb-6">Activité récente</h2>
         <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <Activity className="size-8 text-muted-foreground" />
+          <ActivityIcon className="size-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Aucune activité récente</p>
         </div>
       </Card>

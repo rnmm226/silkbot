@@ -154,7 +154,6 @@ export function Navigation() {
                 href="/login"
                 ref={magnetRef}
                 onMouseMove={e => applyMagnet(e, magnetRef as React.RefObject<HTMLAnchorElement>)}
-                onMouseLeave={() => resetMagnet(magnetRef as React.RefObject<HTMLAnchorElement>)}
                 className={`transition-all duration-500 ${
                   isScrolled ? "text-xs" : "text-sm"
                 } font-medium px-4 py-2 rounded-xl`}
