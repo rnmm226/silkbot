@@ -2,131 +2,80 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { 
-  FileText, 
-  User, 
-  Upload, 
-  CheckCircle, 
-  Trash2, 
-  RefreshCw,
-  Activity as ActivityIcon,
-} from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { fetchActivities, type Activity } from "@/lib/api/admin";
+import { MessageSquare, Upload, UserPlus } from "lucide-react";
 
-const iconMap = {
-  upload: { icon: Upload, color: "bg-emerald-500" },
-  verify: { icon: CheckCircle, color: "bg-blue-500" },
-  user: { icon: User, color: "bg-purple-500" },
-  delete: { icon: Trash2, color: "bg-red-500" },
-  update: { icon: RefreshCw, color: "bg-amber-500" },
-};
-
-interface RecentActivityProps {
-  limit?: number;
-  className?: string;
+interface Activity {
+  id: string;
+  type: "user" | "document" | "chat";
+  label: string;
+  sub: string;
+  time: string;
 }
 
-export function RecentActivity({ limit = 10, className }: RecentActivityProps) {
+const iconMap = {
+  user: UserPlus,
+  document: Upload,
+  chat: MessageSquare,
+};
+
+const colorMap = {
+  user: "text-blue-500 bg-blue-500/10",
+  document: "text-emerald-500 bg-emerald-500/10",
+  chat: "text-violet-500 bg-violet-500/10",
+};
+
+export function RecentActivity({ limit = 10 }: { limit?: number }) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadActivities = async () => {
+    async function load() {
       try {
-        setLoading(true);
-        const data = await fetchActivities(limit);
-        setActivities(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erreur de chargement");
+        const res = await fetch(`/api/admin/activity?limit=${limit}`);
+        if (res.ok) {
+          const data = await res.json();
+          setActivities(data);
+        }
+      } catch {
+        // keep empty
       } finally {
         setLoading(false);
       }
-    };
-
-    loadActivities();
+    }
+    load();
   }, [limit]);
 
-  if (loading) {
-    return (
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold text-foreground mb-6">Activité récente</h2>
-        <div className="space-y-4">
-          {Array.from({ length: Math.min(limit, 4) }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 p-3">
-              <Skeleton className="w-10 h-10 rounded-lg" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-              <Skeleton className="h-3 w-16" />
-            </div>
+  return (
+    <Card className="p-4">
+      <h3 className="font-semibold text-sm mb-3">Activité récente</h3>
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-muted animate-pulse" />
           ))}
         </div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold text-foreground mb-6">Activité récente</h2>
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <ActivityIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Impossible de charger les activités</p>
-          <p className="text-xs text-muted-foreground">{error}</p>
-        </div>
-      </Card>
-    );
-  }
-
-  if (activities.length === 0) {
-    return (
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold text-foreground mb-6">Activité récente</h2>
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <ActivityIcon className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Aucune activité récente</p>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className={cn("p-6 transition-all duration-500 hover:shadow-xl animate-slide-in-up", className)}>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Activité récente</h2>
-        <span className="text-xs text-muted-foreground">
-          {activities.length} activité(s)
-        </span>
-      </div>
-      <div className="space-y-4">
-        {activities.map((activity, index) => {
-          const IconConfig = iconMap[activity.type] || iconMap.upload;
-          const Icon = IconConfig.icon;
-          
-          return (
-            <div
-              key={activity.id}
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-all duration-300 cursor-pointer group"
-              style={{ animationDelay: `${400 + index * 100}ms` }}
-            >
-              <div className={`${IconConfig.color} w-10 h-10 rounded-lg flex items-center justify-center text-white transition-transform duration-300 group-hover:scale-110`}>
-                <Icon className="w-5 h-5" />
+      ) : activities.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-6">Aucune activité récente</p>
+      ) : (
+        <div className="space-y-2">
+          {activities.map((a) => {
+            const Icon = iconMap[a.type];
+            const color = colorMap[a.type];
+            return (
+              <div key={a.id} className="flex items-center gap-3 py-1.5">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${color}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{a.label}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{a.sub}</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground shrink-0">{a.time}</p>
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-foreground text-sm">{activity.title}</p>
-                <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none">
-                  {activity.description}
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">{activity.time}</span>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }
